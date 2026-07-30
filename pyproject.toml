@@ -1,0 +1,36 @@
+[project]
+name = "tandem-model"
+version = "0.1.0"
+description = "TANDEM (Turbulence ANd DEficit Momentum) wake model: paper-ready analysis code and figure generation"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24.4",
+    "matplotlib>=3.7.5",
+    "jinja2>=3.1.4,<4",
+    "polars>=0.19",
+    "ipykernel>=6.29.5",
+    "seaborn>=0.13.2",
+    "pyarrow>=20.0.0",
+    "xarray>=2023.1",
+    "foreach>=0.4.0",
+    "mitwindfarm",
+    "unified-momentum-model",
+    "padeopsio @ git+https://github.com/kirbyh/padeopsIO@main",
+]
+
+[project.optional-dependencies]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["tandem_model"]
+
+[tool.uv.sources]
+mitwindfarm = { path = "../analysis_code/MITWindfarm" }
+unified-momentum-model = { path = "../analysis_code/Unified-Momentum-Model" }
