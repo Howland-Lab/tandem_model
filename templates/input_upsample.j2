@@ -1,0 +1,13 @@
+&INPUT
+nx                    = {{ "%d"|format(nx/2|int) }}          ! nx of downsampled simulation
+ny                    = {{ "%d"|format(ny/2|int) }}          ! ny of downsampled simulation
+nz                    = {{ "%d"|format(nz|int) }}          ! nz of downsampled simulation
+inputdir              = "{{ restart_dir }}"   ! Directory for any input files
+outputdir             = "{{ dirname }}"   ! Directory for all output files
+inputFile_TID         = {{ restart_tid }}        ! TimeID of the restart file for the original data
+inputFile_RID         = {{ restart_rid }}           ! RunID of the restart file for the original data
+outputFile_TID        = 0            ! TimeID of the restart file with upsampled data
+outputFile_RID        = 02           ! RunID of the restart file with the upsampled data
+upsampleInZ           = .FALSE.
+isStratified          = .TRUE.       ! Is there a restart file for potential temperature?
+/
