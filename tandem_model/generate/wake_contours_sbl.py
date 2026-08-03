@@ -30,7 +30,7 @@ XVALS = [5, 10, 15]
 
 # solver keys, in the desired figure order (see tandem_model.models.DISPLAY_NAMES
 # for display names)
-MODELS = ["gauss", "varvortex", "scott", "kl-hub", "tandem"]
+MODELS = ["gauss", "varvortex", "2021", "scott", "kl-hub", "tandem"]
 
 XLIM_XY = [-2, 15]
 YLIM_XY = [-3, 3]
@@ -193,4 +193,4 @@ def wake_contours_xy(
 
 if __name__ == "__main__":
     print(wake_contours_sbl(regenerate=True))
-    print(wake_contours_xy(regenerate=True))
+    # print(wake_contours_xy(regenerate=True))
