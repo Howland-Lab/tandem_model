@@ -20,12 +20,19 @@ DISPLAY_NAMES = {
     "kl-hub": r"$k-\ell$",
     "tandem": "TANDEM",
     "scott": "Scott",
+    "2021": "Curl",
 }
 
 # model_kwargs shared by all parabolized (curled) RANS turbulence closures;
 # matches 2026_nawea.ipynb cell 6
 CURLED_MODEL_KWARGS = dict(
-    sigma_diff_ic=0.21, auto_expand=True, ybuff=2, dy=0.1, dz=0.1, use_r4=None
+    integrator="scipy_rk23",
+    sigma_diff_ic=0.21,
+    auto_expand=True,
+    ybuff=2,
+    dy=0.1,
+    dz=0.1,
+    use_r4=None,
 )
 CURLED_YLIM, CURLED_ZLIM = [-6, 6], [-2, 2]
 
@@ -34,8 +41,9 @@ CURLED_YLIM, CURLED_ZLIM = [-6, 6], [-2, 2]
 # k_kwargs here (empty dict for defaults, e.g. "kl-hub": {}).
 K_KWARGS = {
     "tandem": dict(C_nu=0.35, l_eps=0.78, C_w=3),
-    "scott": {},
-    "kl-hub": {},
+    "scott": {},  # use default A, sigma
+    "kl-hub": {},  # use default C_nu, C_k1, C_k2
+    "2021": {},  # use default C, kappa; Ro is injected from LES metadata
 }
 
 

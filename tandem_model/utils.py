@@ -20,6 +20,7 @@ from scipy.integrate import trapezoid
 
 import mitwindfarm as mitwf
 import mitwindfarm.tandem  # noqa: F401 - registers TANDEM closures (kl-md, scott, ...)
+from mitwindfarm.utils.integrate import IntegrationException
 from UnifiedMomentumModel import Momentum
 
 # from mitwindfarm import WindfarmSolution, WakeModel, Windfarm, ArbitraryZWindfield, UnifiedAD_veer, Layout
@@ -50,7 +51,8 @@ def get_obukhov_length(sim: pio.BudgetIO, crop_budget=True) -> float:
         if len(ret["Inv. Ob."]) > 0:
             break
     else:
-        raise ValueError(f"No logfile with 'Inv. Ob.' diagnostics found in {sim.dirname}")
+        return np.inf
+        # raise ValueError(f"No logfile with 'Inv. Ob.' diagnostics found in {sim.dirname}")
 
     if crop_budget and sim.input_nml["budget_time_avg"]["do_budgets"]:
         # re-query with crop_equal so "Time" is cropped to match "Inv. Ob." length
@@ -94,50 +96,227 @@ def wake_fields_LES(
     return inflow, delta
 
 
-def inflow_LES(sim: pio.BudgetIO, xlim=None, ylim=None, zlim=None, return_ds=False, normalize=False, avg_in_y=True):
+def _windfield_from_inflow_df(df: pl.DataFrame, normalize=False):
+    """Builds an ArbitraryZWindfield from a cached inflow profile DataFrame (see `inflow_LES`)."""
+    z = df["z"].to_numpy()
+    U = df["U"].to_numpy()
+    ubar = df["ubar"].to_numpy()
+    vbar = df["vbar"].to_numpy()
+    tke = df["tke"].to_numpy()
+
+    if normalize:
+        uhub = np.interp(0, z, U)
+        U = U / uhub
+        tke = tke / uhub**2
+
+    return mitwf.ArbitraryZWindfield(
+        z=z,
+        U_z=U,
+        wdir_z=np.arctan2(vbar, ubar),
+        TIamb_z=np.sqrt(2 / 3 * tke) / U,
+    )
+
+
+def _read_inflow_profile_LES(sim: pio.BudgetIO, xlim=None, ylim=None, zlim=None):
     """
-    Returns the xy-averaged inflow field from an LES simulation using
-    velocity fields upwind of the turbine.
+    Reads and y-averages the inflow profile (ubar, vbar, wbar, Tbar, tke, U
+    vs. z) from the LES budget file. This is the disk-I/O-heavy step that
+    `inflow_LES` caches, since it's otherwise re-read from disk once per
+    wake model in a `compute_cp`-style loop.
     """
     if xlim is None:
         xst = sim.grid.x.min().item()
         xen = xst + 1  # assume this is in turbine-normalized coordinates
         xlim = [xst, xen]
     ds_base = sim.slice(
-        budget_terms=["ubar", "vbar", "wbar", "uu", "vv", "ww"],
+        budget_terms=["ubar", "vbar", "wbar", "uu", "vv", "ww", "Tbar"],
         xlim=xlim,
         ylim=ylim,
         zlim=zlim,
     )
-    ds_base = ds_base.mean(("x", "y")) if avg_in_y else ds_base.mean(("x"))
+    ds_base = ds_base.mean(("x", "y"))
     ds_base["tke"] = 0.5 * (ds_base["uu"] + ds_base["vv"] + ds_base["ww"])
-    ds_base["U"] = np.sqrt(ds_base["ubar"]**2 + ds_base["vbar"]**2)
+    ds_base["U"] = np.sqrt(ds_base["ubar"] ** 2 + ds_base["vbar"] ** 2)
 
-    if normalize:
-        uhub = ds_base["U"].interp(z=0).mean().item()
-        for key in ["U", "ubar", "vbar", "wbar"]:
-            if key in ds_base:
-                ds_base[key] = ds_base[key] / uhub
-        for key in ["tke", "uu", "vv", "ww"]:
-            ds_base[key] = ds_base[key] / uhub**2
-        ds_base = ds_base.assign_attrs({"uhub": uhub})  # save this information
+    return pl.DataFrame(
+        {
+            "z": ds_base.z.to_numpy(),
+            "ubar": ds_base["ubar"].to_numpy(),
+            "vbar": ds_base["vbar"].to_numpy(),
+            "wbar": ds_base["wbar"].to_numpy(),
+            "Tbar": ds_base["Tbar"].to_numpy(),
+            "tke": ds_base["tke"].to_numpy(),
+            "U": ds_base["U"].to_numpy(),
+        }
+    )
 
-    if return_ds:
-        return ds_base
 
-    if "y" in ds_base.dims:
-        ds_base = ds_base.mean("y")  # now we need to average in y regardless
+def inflow_LES(
+    sim: pio.BudgetIO,
+    xlim=None,
+    ylim=None,
+    zlim=None,
+    return_ds=False,
+    normalize=False,
+    avg_in_y=True,
+    regenerate=False,
+):
+    """
+    Returns the xy-averaged inflow field from an LES simulation using
+    velocity fields upwind of the turbine.
+
+    For the canonical inflow slice (default xlim/ylim/zlim, return_ds=False
+    - i.e. how `solve_windfarm_LES` calls this), the per-z profile (U, wdir,
+    TI, Tbar, tke) is cached at data/<family>/<case>_inflow.csv (see
+    `caching.case_cache_key`), so repeated calls for the same case (e.g.
+    once per wake model) don't re-read the LES budget file from disk.
+    Non-default slicing (used e.g. by `wake_fields_LES`) bypasses the cache.
+    """
+    use_cache = xlim is None and ylim is None and zlim is None and not return_ds
+    if not use_cache:
+        ds_base = sim.slice(
+            budget_terms=["ubar", "vbar", "wbar", "uu", "vv", "ww"],
+            xlim=xlim,
+            ylim=ylim,
+            zlim=zlim,
+        )
+        ds_base = ds_base.mean(("x", "y")) if avg_in_y else ds_base.mean(("x"))
+        ds_base["tke"] = 0.5 * (ds_base["uu"] + ds_base["vv"] + ds_base["ww"])
+        ds_base["U"] = np.sqrt(ds_base["ubar"] ** 2 + ds_base["vbar"] ** 2)
+
+        if normalize:
+            uhub = ds_base["U"].interp(z=0).mean().item()
+            for key in ["U", "ubar", "vbar", "wbar"]:
+                if key in ds_base:
+                    ds_base[key] = ds_base[key] / uhub
+            for key in ["tke", "uu", "vv", "ww"]:
+                ds_base[key] = ds_base[key] / uhub**2
+            ds_base = ds_base.assign_attrs({"uhub": uhub})  # save this information
+
+        if return_ds:
+            return ds_base
+
+        if "y" in ds_base.dims:
+            ds_base = ds_base.mean("y")  # now we need to average in y regardless
+
+        z = ds_base.z.to_numpy()
+        ubar = ds_base["ubar"].to_numpy()
+        vbar = ds_base["vbar"].to_numpy()
+        U = ds_base["U"].to_numpy()
+        tke = ds_base["tke"].to_numpy()
+    else:
+        from tandem_model import caching as cache, constants
+
+        family, case = cache.case_cache_key(sim.dirname)
+        cache_file = constants.DATA_PATH / family / f"{case}_inflow.csv"
+
+        @cache.cache_polars(cache_file)
+        def _generate(regenerate=False):
+            return _read_inflow_profile_LES(sim)
+
+        df = _generate(regenerate=regenerate)
+        return _windfield_from_inflow_df(df, normalize=normalize)
 
     windfield = mitwf.ArbitraryZWindfield(
-        z=ds_base.z.to_numpy(),
-        U_z=ds_base["U"].to_numpy(),
-        wdir_z=np.arctan2(
-            ds_base["vbar"].to_numpy(),
-            ds_base["ubar"].to_numpy(),
-        ),
-        TIamb_z=np.sqrt(2 / 3 * ds_base["tke"].to_numpy()) / ds_base["U"].to_numpy(),
+        z=z,
+        U_z=U,
+        wdir_z=np.arctan2(vbar, ubar),
+        TIamb_z=np.sqrt(2 / 3 * tke) / U,
     )
     return windfield
+
+
+def _read_layout_LES(sim: pio.BudgetIO) -> pl.DataFrame:
+    """Reads turbine positions (in the sim's normalized/turbine-origin frame) and setpoints."""
+    xs, ys, zs = (np.array([t.pos for t in sim.turbineArray]) - sim.origin).T
+    return pl.DataFrame(
+        {
+            "x": xs,
+            "y": ys,
+            "z": zs,
+            "ct": [t.ct for t in sim.turbineArray],
+            "yaw": [t.yaw for t in sim.turbineArray],  # degrees
+        }
+    )
+
+
+def layout_LES(sim: pio.BudgetIO, regenerate=False):
+    """
+    Returns (layout, setpoints) for an LES case's turbine array, cached at
+    data/<family>/<case>_layout.csv (see `caching.case_cache_key`) so the
+    layout can be reconstructed without a BudgetIO object.
+    """
+    from tandem_model import caching as cache, constants
+
+    family, case = cache.case_cache_key(sim.dirname)
+    cache_file = constants.DATA_PATH / family / f"{case}_layout.csv"
+
+    @cache.cache_polars(cache_file)
+    def _generate(regenerate=False):
+        return _read_layout_LES(sim)
+
+    df = _generate(regenerate=regenerate)
+    return _layout_from_df(df)
+
+
+def _layout_from_df(df: pl.DataFrame):
+    layout = mitwf.Layout(df["x"].to_numpy(), df["y"].to_numpy(), df["z"].to_numpy())
+    setpoints = [(ct, np.radians(yaw)) for ct, yaw in zip(df["ct"], df["yaw"])]
+    return layout, setpoints
+
+
+def case_meta_LES(sim: pio.BudgetIO, regenerate=False) -> dict:
+    """
+    Returns small scalar metadata about an LES case (`xmax`: max x for wake
+    marching, `L_obu`: Obukhov length used by the tandem/tandem-md
+    turbulence closures, `zwall`: wall height for the curled wake solver,
+    `Ro`: turbine-diameter-based Rossby number used by the "2021" (Curl)
+    turbulence closure) needed to set up a curled-wake solve, cached at
+    data/<family>/<case>_meta.csv so it can be reconstructed without a
+    BudgetIO object.
+    """
+    from tandem_model import caching as cache, constants
+
+    family, case = cache.case_cache_key(sim.dirname)
+    cache_file = constants.DATA_PATH / family / f"{case}_meta.csv"
+
+    @cache.cache_polars(cache_file)
+    def _generate(regenerate=False):
+        return pl.DataFrame(
+            {
+                "xmax": [xmax_LES(sim)],
+                "L_obu": [get_obukhov_length(sim)],
+                "zwall": [-sim.origin[2]],
+                "Ro": [sim.Ro],
+            }
+        )
+
+    df = _generate(regenerate=regenerate)
+    return {k: df[k][0] for k in df.columns}
+
+
+def load_cached_case(family: str, case: str, normalize=True):
+    """
+    Loads a previously-cached inflow profile, turbine layout/setpoints, and
+    case metadata for `family`/`case` (see `caching.case_cache_key`)
+    directly from data/<family>/<case>_{inflow,layout,meta}.csv, without
+    needing a BudgetIO object or access to the underlying LES data. Meant
+    for running wake models on a machine without access to the LES budgets
+    (e.g. `solve_windfarm_offline`). Run once on a machine with access to
+    the LES data (any `solve_windfarm_LES`/`compute_cp` call) to populate
+    the cache files, then copy `data/<family>/` to run offline.
+    """
+    from tandem_model import constants
+
+    case_dir = constants.DATA_PATH / family
+    df_inflow = pl.read_csv(case_dir / f"{case}_inflow.csv")
+    df_layout = pl.read_csv(case_dir / f"{case}_layout.csv")
+    df_meta = pl.read_csv(case_dir / f"{case}_meta.csv")
+
+    windfield = _windfield_from_inflow_df(df_inflow, normalize=normalize)
+    layout, setpoints = _layout_from_df(df_layout)
+    meta = {k: df_meta[k][0] for k in df_meta.columns}
+    return windfield, layout, setpoints, meta
 
 
 def interp_field(
@@ -354,12 +533,12 @@ class ModelWakeField(WakeField):
                 zlim = slice(max(zlim[0], sol.windfield.bottom_wall_z), zlim[1])
             # set fields:
             du = (
-                mitwf.return_xr(sol, field="du")
+                return_xr(sol, field="du")
                 .slice(xlim=xlim, ylim=ylim)
                 .sel(z=zlim)
             )
             dk = (
-                mitwf.return_xr(sol, field="dk")
+                return_xr(sol, field="dk")
                 .slice(xlim=xlim, ylim=ylim)
                 .sel(z=zlim)
             )
@@ -408,8 +587,9 @@ def solve_curl_wakefield_LES(
     Compute wake fields from LES simulation data using a curl model.
     """
 
-    # setup model kwargs
-    zwall = -sim.origin[2]
+    # setup model kwargs; also populates data/<family>/<case>_meta.csv for offline use
+    meta = case_meta_LES(sim)
+    zwall = meta["zwall"]
     k_kwargs = k_kwargs or {}
     default_kwargs = dict(
         u_model="upwind",
@@ -425,24 +605,40 @@ def solve_curl_wakefield_LES(
 
     # select turbulence model and update k_kwargs:
     if k_model == "2021":
-        k_kwargs = dict(Ro=sim.Ro, **k_kwargs)
+        k_kwargs = dict(Ro=meta["Ro"], **k_kwargs)
     elif k_model in ["tandem", "tandem-md"]:
-        k_kwargs = dict(L_obu=get_obukhov_length(sim), **k_kwargs)
+        k_kwargs = dict(L_obu=meta["L_obu"], **k_kwargs)
     elif k_model in ["k-l", "kl-hub", "kl-md", "const", "scott"]:
         k_kwargs = k_kwargs
     else:
         raise ValueError(f"Unknown k_model: {k_model}")
 
-    # setup wind farm model and solve:
-    wf = mitwf.CurledWindfarm_LES(
-        rotor_model=mitwf.UnifiedAD_veer(rotor_grid=mitwf.Area()),
-        solver_kwargs=dict(k_model=k_model, k_kwargs=k_kwargs, **model_kwargs)
-    )
-
-    xmax = xmax or xmax_LES(sim)
+    xmax = xmax or meta["xmax"]
     ylim = ylim or [-2, 2]
     zlim = zlim or [-1, 2]
-    sol = wf(sim, march_to=xmax, ylim=ylim, zlim=zlim, use_LES_IC=use_LES_IC, xst=xst, normalize=normalize)
+    solver_kwargs = dict(k_model=k_model, k_kwargs=k_kwargs, **model_kwargs)
+    rotor_model = mitwf.UnifiedAD_veer(rotor_grid=mitwf.Area())
+
+    if use_LES_IC:
+        # needs the full 3D LES field at x=0 to stamp in as an initial condition,
+        # so it has to read the LES budgets directly (no way around it).
+        wf = mitwf.CurledWindfarm_LES(rotor_model=rotor_model, solver_kwargs=solver_kwargs)
+        sol = wf(sim, march_to=xmax, ylim=ylim, zlim=zlim, use_LES_IC=True, xst=xst, normalize=normalize)
+    else:
+        # no LES-IC stamping needed: build the base windfield from the (cached)
+        # inflow profile and march natively, rather than CurledWindfarm_LES's
+        # own uncached re-read of the LES budgets.
+        inflow = inflow_LES(sim, normalize=normalize)
+        layout, setpoints = layout_LES(sim)
+        wf = mitwf.CurledWindfarm(
+            rotor_model=rotor_model, base_windfield=inflow, solver_kwargs=solver_kwargs
+        )
+        sol = wf(layout, setpoints)
+        try:
+            sol.windfield.march_to(x=xmax, y=0, z=0)  # march out to xmax, as CurledWindfarm_LES does
+        except IntegrationException as e:
+            print(f"Warning: final march_to({xmax}) failed with error: {e}")
+
     return ModelWakeField(sol, ylim=ylim, zlim=zlim) if return_wakefield else sol
 
 
@@ -478,25 +674,18 @@ def solve_windfarm_LES(
     TIamb = inflow.TI(0, 0, 0)  # inflow TI at hub height
 
     if wakemodel in list(mitwf.CurledTurbulenceModel._registry.keys()):
-        return solve_curl_wakefield_LES(sim, wakemodel, normalize=normalize, **model_kwargs)
+        return solve_curl_wakefield_LES(
+            sim,
+            wakemodel,
+            normalize=normalize,
+            return_wakefield=return_wakefield,
+            **model_kwargs,
+        )
     else:
         try:
             wake_model=get_wakemodel(wakemodel, inflow=inflow, **model_kwargs)
         except ValueError:
             raise
-    # if wakemodel == "vortex":
-    #     _kws = {"windfield": inflow, **model_kwargs}
-    #     wake_model = mitwf.VortexWakeModel(**_kws)
-    # elif wakemodel == "varvortex":
-    #     _kws = {"windfield": inflow, **model_kwargs}
-    #     wake_model = mitwf.VariableVortexWakeModel(**_kws)
-    # elif wakemodel == "gauss":
-    #     _kws = {"a": 0.636, "b": 0, "c": 0, **model_kwargs}
-    #     wake_model = mitwf.VariableKwGaussianWakeModel(**_kws)
-    # elif wakemodel in list(mitwf.CurledTurbulenceModel._registry.keys()):
-    #     return solve_curl_wakefield_LES(sim, wakemodel, normalize=normalize, **model_kwargs)
-    # else:
-    #     raise ValueError(f"Unknown wakemodel: {wakemodel}")
 
     wf = mitwf.Windfarm(
         base_windfield=inflow,
@@ -504,15 +693,74 @@ def solve_windfarm_LES(
         wake_model=wake_model,
         TIamb=TIamb,  # try to deprecate this parameter !!
     )
-    # layout = mitwf.Layout([0], [0], [0])
-    # setpoints = [(t.ct, np.radians(t.yaw)) for t in sim.ta]
-    xs, ys, zs = (
-        np.array([t.pos for t in sim.turbineArray]) - sim.origin
-    ).T
-    layout = mitwf.Layout(xs, ys, zs)
-    setpoints = [(t.ct, np.radians(t.yaw)) for t in sim.turbineArray]
+    layout, setpoints = layout_LES(sim)
     sol = wf(layout, setpoints)
     return ModelWakeField(sol) if return_wakefield else sol
+
+
+def solve_windfarm_offline(
+    family: str,
+    case: str,
+    wakemodel: str,
+    rotor_model=None,
+    normalize=True,
+    k_kwargs=None,
+    model_kwargs=None,
+    ylim=None,
+    zlim=None,
+):
+    """
+    Same as `solve_windfarm_LES`, but sources the inflow/layout/setpoints
+    from the cached files written by `inflow_LES`/`layout_LES`/`case_meta_LES`
+    (data/<family>/<case>_{inflow,layout,meta}.csv) instead of a BudgetIO
+    object - usable on a machine without access to the LES data. `ylim`/
+    `zlim` are accepted (to match `curled_kwargs`' output) but unused, since
+    they only bound the LES-IC domain, which offline solves don't use.
+
+    Run `solve_windfarm_LES`/`compute_cp` once on a machine with access to
+    the LES data to populate the cache for a given `family`/`case`, then
+    copy `data/<family>/` to run this offline.
+    """
+    rotor_model = mitwf.UnifiedAD_veer(rotor_grid=mitwf.Area()) if rotor_model is None else rotor_model
+    inflow, layout, setpoints, meta = load_cached_case(family, case, normalize=normalize)
+
+    if wakemodel in list(mitwf.CurledTurbulenceModel._registry.keys()):
+        k_kwargs = k_kwargs or {}
+        default_kwargs = dict(
+            u_model="upwind",
+            integrator="scipy_rk45",
+            ybuff=3,
+            verbose=False,
+            auto_expand=True,
+            bottom_wall_z=meta["zwall"],
+            zero_at_boundaries=True,
+        )
+        model_kwargs = {**default_kwargs, **(model_kwargs or {})}
+        if wakemodel in ["tandem", "tandem-md"]:
+            k_kwargs = dict(L_obu=meta["L_obu"], **k_kwargs)
+        elif wakemodel == "2021":
+            k_kwargs = dict(Ro=meta["Ro"], **k_kwargs)
+
+        wf = mitwf.CurledWindfarm(
+            rotor_model=rotor_model,
+            base_windfield=inflow,
+            solver_kwargs=dict(k_model=wakemodel, k_kwargs=k_kwargs, **model_kwargs),
+        )
+        sol = wf(layout, setpoints)
+        try:
+            sol.windfield.march_to(x=meta["xmax"], y=0, z=0)
+        except IntegrationException as e:
+            print(f"Warning: final march_to({meta['xmax']}) failed with error: {e}")
+        return sol
+
+    wake_model = get_wakemodel(wakemodel, inflow=inflow, **(model_kwargs or {}))
+    wf = mitwf.Windfarm(
+        base_windfield=inflow,
+        rotor_model=rotor_model,
+        wake_model=wake_model,
+        TIamb=inflow.TI(0, 0, 0),
+    )
+    return wf(layout, setpoints)
 
 
 streamtube_kwargs = dict(R=0.35)
@@ -849,3 +1097,129 @@ def lmix_from_padeops(
         })
     else:
         return xr.Dataset({"lmix_md": lmix_md,"lmix_les": lmix_les,})
+
+
+from mitwindfarm import (
+    WindfarmSolution,
+    Layout,
+    ArbitraryZWindfield,
+    CurledWakeWindfield,
+    CurledWindfarm,
+)
+from mitwindfarm.CurledWake import TurbineProperties
+
+class CurledWindfarm_LES(CurledWindfarm):
+    """
+    Extension of the CurledWindfarm class that takes an LES initial
+    condition (velocity and turbulence fields) at x=0 to commence the
+    forward marching.
+    """
+
+    def __call__(
+        self,
+        simulation,
+        ds=None,
+        xst=3,
+        ylim=None,
+        zlim=None,
+        march_to=15,
+        normalize=False,
+        use_LES_IC=True,
+    ) -> WindfarmSolution:
+        """
+        Solves for the rotor solutions in the wind farm layout, marching
+        the CurledWakeWindfield to each rotor location as necessary.
+        """
+        xs, ys, zs = (
+            np.array([t.pos for t in simulation.turbineArray]) - simulation.origin
+        ).T
+        layout = Layout(xs, ys, zs)
+        setpoints = [(t.ct, np.radians(t.yaw)) for t in simulation.turbineArray]
+
+        N = len(layout)
+        wakes = N * [None]
+        rotor_solutions = N * [None]
+
+        if ds is None:
+            ds = simulation.slice(
+                budget_terms=["ubar", "vbar", "wbar", "uu", "vv", "ww"],
+                xlim=[-100, xst],
+            )
+            ds["tke"] = 0.5 * (ds["uu"] + ds["vv"] + ds["ww"])
+
+        ds_base = ds.isel(x=0)
+        ds_base["U"] = np.sqrt(ds_base["ubar"] ** 2 + ds_base["vbar"] ** 2)
+        ds["U"] = np.sqrt(ds["ubar"] ** 2 + ds["vbar"] ** 2)
+
+        if normalize:
+            uhub = ds_base["U"].interp(z=0).mean().item()
+            for key in ["U", "ubar", "vbar", "wbar"]:
+                if key in ds:
+                    ds[key] = ds[key] / uhub
+                    ds_base[key] = ds_base[key] / uhub
+            for key in ["tke", "uu", "vv", "ww"]:
+                ds[key] = ds[key] / uhub**2
+                ds_base[key] = ds_base[key] / uhub**2
+
+        ds_IC = (ds - ds_base).slice(xlim=[0, xst], ylim=ylim, zlim=zlim)
+
+        self.base_windfield = ArbitraryZWindfield(
+            z=ds_base.z.to_numpy(),
+            U_z=ds_base["U"].mean(dim="y").to_numpy(),
+            wdir_z=np.arctan2(
+                ds_base["vbar"].mean(dim="y").to_numpy(),
+                ds_base["ubar"].mean(dim="y").to_numpy(),
+            ),
+            TIamb_z=np.sqrt(2 / 3 * ds_base["tke"].mean(dim="y").to_numpy())
+            / ds_base["U"].mean(dim="y").to_numpy(),
+        )
+
+        windfield = CurledWakeWindfield(self.base_windfield, **self.solver_kwargs)
+
+        if use_LES_IC:
+            windfield.du = ds_IC["ubar"].to_numpy()
+            windfield.dv = ds_IC["vbar"].to_numpy()
+            windfield.dw = ds_IC["wbar"].to_numpy()
+            windfield.dk = ds_IC["tke"].to_numpy()
+            windfield.extra_fx = np.zeros((ds_IC.grid.ny, ds_IC.grid.nz))  # deprecate this
+            windfield.grid = [ds_IC.x.to_numpy(), ds_IC.y.to_numpy(), ds_IC.z.to_numpy()]
+            for module in windfield.modules.values():
+                module.x = ds_IC.x.to_numpy()  # ensure all modules have the correct x grid
+
+        # ============= Commence forward marching =============
+        for i, (x, y, z) in layout.iter_downstream():
+            windfield.march_to(
+                x=x, y=y, z=z
+            )  # march to the next rotor location, extrapolating where necessary
+            rotor_solutions[i] = self.rotor_model(x, y, z, windfield, *setpoints[i])
+            rotor_solutions[i].idx = i
+            if not use_LES_IC or x > xst:
+                windfield.stamp_ic(
+                    rotor_solutions[i], x, y, z
+                )  # stamp the rotor solution into the windfield
+            else:
+                windfield.turbines.append(TurbineProperties(x, y, z, 0.5, rotor_solutions[i]))
+
+        try:
+            if march_to is not None:
+                windfield.march_to(x=march_to, y=0, z=0)
+        except IntegrationException as e:
+            print(f"Warning: final march_to({march_to}) failed with error: {e}")
+
+        return WindfarmSolution(
+            layout, setpoints, rotor_solutions, wakes, windfield
+        )
+
+
+def return_xr(wfsol: WindfarmSolution, x=0, y=0, z=0, field="dk") -> xr.DataArray:
+    """Returns the interpolated field from a solved (curled) wind farm as an xarray.DataArray"""
+    wfsol.windfield.march_to(x=x, y=y, z=z)
+
+    return xr.DataArray(
+        data=getattr(wfsol.windfield, field),
+        coords={
+            "x": wfsol.windfield.x,
+            "y": wfsol.windfield.y,
+            "z": wfsol.windfield.z,
+        },
+    )
