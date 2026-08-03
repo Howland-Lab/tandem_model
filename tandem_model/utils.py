@@ -32,6 +32,41 @@ def xmax_LES(sim: pio.BudgetIO, buffer=2) -> float:
     return xen
 
 
+def get_obukhov_length(sim: pio.BudgetIO, crop_budget=True) -> float:
+    """
+    Gleans the time-averaged Obukhov length L_obu from the PadeOps log file's
+    inverse Obukhov length diagnostic ("Inv. Ob."). Returns np.inf for neutral
+    (zero inverse Obukhov length) stratification.
+    """
+    # some case directories accumulate multiple resubmission logfiles (e.g. a
+    # requeued job that exited before printing any diagnostics); glob order
+    # (get_logfiles' default id=-1) isn't guaranteed to land on one that has
+    # data, so scan from the most recent backwards for one that does.
+    logfiles = sim.get_logfiles(id=None)
+    for logfile in reversed(logfiles):
+        ret = pio.query_logfile(
+            logfile, search_terms=["Inv. Ob.", "TIDX", "Time"], crop_equal=False
+        )
+        if len(ret["Inv. Ob."]) > 0:
+            break
+    else:
+        raise ValueError(f"No logfile with 'Inv. Ob.' diagnostics found in {sim.dirname}")
+
+    if crop_budget and sim.input_nml["budget_time_avg"]["do_budgets"]:
+        # re-query with crop_equal so "Time" is cropped to match "Inv. Ob." length
+        ret = pio.query_logfile(logfile, search_terms=["Inv. Ob.", "TIDX", "Time"])
+    inv_obu = ret["Inv. Ob."]
+
+    if crop_budget and sim.input_nml["budget_time_avg"]["do_budgets"]:
+        time_budget_st = sim.input_nml["budget_time_avg"]["time_budget_start"]
+        filt = ret["Time"] > time_budget_st
+        if filt.sum() > 0:
+            inv_obu = inv_obu[filt]
+
+    inv_obu = np.mean(inv_obu)
+    return np.inf if (inv_obu == 0 or np.isnan(inv_obu)) else 1 / inv_obu
+
+
 def wake_fields_LES(
     sim: pio.BudgetIO, xlim=None, ylim=None, zlim=None, gc=True, avg_inflow_y=True,
 ) -> xr.Dataset:
@@ -81,7 +116,8 @@ def inflow_LES(sim: pio.BudgetIO, xlim=None, ylim=None, zlim=None, return_ds=Fal
     if normalize:
         uhub = ds_base["U"].interp(z=0).mean().item()
         for key in ["U", "ubar", "vbar", "wbar"]:
-            ds_base[key] = ds_base[key] / uhub
+            if key in ds_base:
+                ds_base[key] = ds_base[key] / uhub
         for key in ["tke", "uu", "vv", "ww"]:
             ds_base[key] = ds_base[key] / uhub**2
         ds_base = ds_base.assign_attrs({"uhub": uhub})  # save this information
@@ -192,7 +228,8 @@ class WakeField:
             self.dk = self.dk / self.uhub**2
             if hasattr(self, "inflow"):
                 for key in ["ubar", "vbar", "wbar", "U"]:
-                    self.inflow[key] = self.inflow[key] / self.uhub
+                    if key in self.inflow:
+                        self.inflow[key] = self.inflow[key] / self.uhub
             self.normalized = True
 
     def unnormalize(self):
@@ -201,7 +238,8 @@ class WakeField:
             self.dk = self.dk * self.uhub**2
             if hasattr(self, "inflow"):
                 for key in ["ubar", "vbar", "wbar", "U"]:
-                    self.inflow[key] = self.inflow[key] * self.uhub
+                    if key in self.inflow:
+                        self.inflow[key] = self.inflow[key] * self.uhub
             self.normalized = False
 
     def compare(self, other: "WakeField", field: str, relative: bool = False, xlim=None, ylim=None, zlim=None):
@@ -388,13 +426,8 @@ def solve_curl_wakefield_LES(
     # select turbulence model and update k_kwargs:
     if k_model == "2021":
         k_kwargs = dict(Ro=sim.Ro, **k_kwargs)
-    elif k_model in ["kl-interp", "kl-les", "kl-yz"]:
-        try:
-            Inv_obu = sim.get_logqty_timeavg("Inv. Ob.")
-        except FileNotFoundError:
-            Inv_obu = np.nan
-        L_obu = 1 / Inv_obu if not (Inv_obu == 0 or np.isnan(Inv_obu)) else np.inf
-        k_kwargs = dict(L_obu=L_obu, **k_kwargs)
+    elif k_model in ["tandem", "tandem-md"]:
+        k_kwargs = dict(L_obu=get_obukhov_length(sim), **k_kwargs)
     elif k_model in ["k-l", "kl-hub", "kl-md", "const", "scott"]:
         k_kwargs = k_kwargs
     else:
@@ -729,8 +762,7 @@ def lmix_md_1d(ds, ds_pre, filter_upstream=True):
     shear = compute_shearprod(ds, ds_pre)
     lmix = np.sqrt(
         np.sum(np.maximum(dk, 0) ** 1.5, (1, 2))
-        / np.sum(np.sqrt(np.maximum(k, 0)) * np.maximum(shear, 0), (1, 2))
-        + eps  # de-singularize Dual component
+        / (np.sum(np.sqrt(np.maximum(k, 0)) * np.maximum(shear, 0), (1, 2)) + eps)
     )
 
     if filter_upstream:

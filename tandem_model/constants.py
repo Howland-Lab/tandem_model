@@ -14,6 +14,11 @@ DATA_PATH = BASE / "data"
 FIGPATH = BASE / "figs"
 JSON_PATH = BASE / "templates" / "laminar_defaults.json"
 
+# Symlink farm on scratch: SCRATCH_ROOT/<family>/<case> -> real LES case directories,
+# scattered across ad hoc project trees elsewhere on scratch. Add symlinks here as new
+# data families are pulled into the paper; see caching.case_cache_key.
+SCRATCH_ROOT = Path("/scratch/08445/tg877441/tandem_model")
+
 
 params = dict()
 D = 240  # m

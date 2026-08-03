@@ -12,6 +12,31 @@ CACHE_PATH = Path(__file__).parent.parent / "data"
 CACHE_PATH.mkdir(exist_ok=True)
 
 
+def case_cache_key(dirname: str | Path, root: str | Path | None = None):
+    """
+    Derives a (family, case) pair from a case directory, used to build a
+    unique per-case cache path: CACHE_PATH / family / f"{case}_<func>.csv".
+
+    If `dirname` is inside `root` (default: constants.SCRATCH_ROOT, a symlink
+    farm of `root/<family>/<case>` -> real scratch case directories), family
+    is the top-level name under root (e.g. "sbl"). Otherwise, family falls
+    back to the immediate parent directory's name, and may collide across
+    unrelated data sources that happen to share a leaf directory name.
+    """
+    if root is None:
+        from tandem_model.constants import SCRATCH_ROOT
+
+        root = SCRATCH_ROOT
+
+    dirname = Path(dirname)
+    try:
+        rel = dirname.relative_to(root)
+        family = rel.parts[0]
+    except ValueError:
+        family = dirname.parent.name
+    return family, dirname.name
+
+
 def cache_pickle(cache_file: str | Path):
     """
     Decorator function for caching data using pickle.

@@ -1,9 +1,8 @@
 """
-TNBL (Ekman layer) re-run of Coriolis simulations, with (without)
-shifted fringe targets to mitigate streak development
+Copied from the repository for Heck, Mata, Howland, PRF (2026): 
+"Influence of wind shear and veer on power, thrust, and induction of an actuator disk"
 
 Kirby Heck
-2025 September 02
 """
 
 import numpy as np
@@ -14,10 +13,8 @@ import socket
 
 from tandem_model import input_writer as writer
 
-if "anvil" in socket.gethostname():
-    SBL_PATH = Path(r"/anvil/scratch/x-heck/veer_WES25/sbl_0")  # Anvil sweep with low Cr
-elif "stampede3" in socket.gethostname():
-    SBL_PATH = Path(r"/scratch/08445/tg877441/veer_WES25/sbl_0")  # Stampede3 data
+if "stampede3" in socket.gethostname():
+    SBL_PATH = Path(r"/scratch/08445/tg877441/tandem_model/sbl")  # Stampede3 data
 else:
     SBL_PATH = None
 
