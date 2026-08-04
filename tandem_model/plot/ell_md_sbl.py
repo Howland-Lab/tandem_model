@@ -18,14 +18,11 @@ C_NU = 0.35
 C_w = 3
 
 dirnames = [SCRATCH_ROOT / "sbl" / f"G_01_z0_02_dTsurf_dt_{i:02d}" for i in range(0, 6)]
-# + [
-#     # r"/scratch/08445/tg877441/veer_WES25/uniform/run2",
-#     SCRATCH_ROOT / "synthetic_veer_ti" / "veer_00_TI_02_k_bandpass_left_00",
-# ]
+
 
 
 def main(regenerate=False):
-    fig, ax = plt.subplots(figsize=(4, 2.5))
+    fig, ax = plt.subplots(figsize=(3.5, 2.5))
     df = ell_md_list(
         dirnames, regenerate=regenerate, zlim=[-1, 1], xlim=[0, 15]
     ).with_columns(
@@ -38,14 +35,14 @@ def main(regenerate=False):
     )
 
     # plot l_w/D lines
-    ax.plot([], [], color="w", label="$\\ell_w/D$")  # dummy for legend title
+    ax.plot([], [], color="w", label="$C_w \\ell_w/D$")  # dummy for legend title
     for color, (_, group) in zip(palette, df.group_by("Cr", maintain_order=True)):
         yval = group["l_w"][0] * C_w
         ax.plot(
             [0.33, 0.5],
             [yval, yval],
             color=color,
-            ls="--",
+            ls=":",
             lw=1.5,
             alpha=0.8,
             label=f"${yval:.2f}$",
@@ -64,4 +61,4 @@ def main(regenerate=False):
 
 
 if __name__ == "__main__":
-    main(True)
+    main(False)

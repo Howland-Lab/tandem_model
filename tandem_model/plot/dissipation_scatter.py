@@ -38,8 +38,8 @@ def main(regenerate=False):
     xmax = dk32.max()
     L_EPS = (df["diss"] * dk32).sum() / (dk32**2).sum()  # slope of best-fit line through origin
     ax.plot([0, xmax], [0, xmax * L_EPS], color="k", ls="--", label=f"Fit $D/\\ell_\\varepsilon = {L_EPS:.1f}$")
-    ax.set_xlabel(r"$\Delta k^{3/2} / u_\infty^3$")
-    ax.set_ylabel(r"$\Delta \varepsilon \, D / u_\infty^3$")
+    ax.set_xlabel(r"$\Delta k^{3/2} / U_h^3$")
+    ax.set_ylabel(r"$\Delta \varepsilon \, D / U_h^3$")
     ax.legend(fontsize=8)
 
     figuresettings.save()
