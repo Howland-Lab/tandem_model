@@ -116,5 +116,5 @@ def main_all_TI(regenerate=False):
     plt.close()
 
 if __name__ == "__main__":
-    main("TI_00", False)
+    # main("TI_00", False)
     main_all_TI(False)

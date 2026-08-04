@@ -117,6 +117,40 @@ def _windfield_from_inflow_df(df: pl.DataFrame, normalize=False):
     )
 
 
+# primary run id -> precursor run id, for LES families that run a separate
+# precursor simulation to generate the inflow (e.g. synthetic-inflow cases
+# where TI/shear evolve with x, so the primary run's own domain-start slice
+# doesn't match the rotor-plane inflow condition)
+PRECURSOR_RUNID = {1: 2, 5: 4}
+
+
+def _inflow_source_and_xlim(sim: pio.BudgetIO, xlim=None):
+    """
+    Resolves the BudgetIO and x-slice to read an undisturbed (pre-wake)
+    inflow profile from. If `xlim` is given explicitly, returns `(sim,
+    xlim)` unchanged. Otherwise, for LES families with a known precursor run
+    (see PRECURSOR_RUNID), returns the precursor BudgetIO (aligned to sim's
+    coordinate origin, so x=0 still means the rotor plane) and a rotor-plane
+    slice (x in [-0.5, 0.5]) -- this matters for synthetic-inflow cases,
+    where sim's own upstream slice can differ from the rotor-plane profile.
+    Falls back to sim's own first-meter-of-domain slice if no precursor run
+    is known for sim.runid (e.g. horizontally-homogeneous inflow, where the
+    domain-start slice already matches the rotor plane).
+    """
+    if xlim is not None:
+        return sim, xlim
+
+    precursor_runid = PRECURSOR_RUNID.get(sim.runid)
+    if precursor_runid is not None and precursor_runid != sim.runid:
+        precursor = pio.BudgetIO(
+            sim.dirname, padeops=True, runid=precursor_runid, normalize_origin=sim.origin
+        )
+        return precursor, [-0.5, 0.5]
+
+    xst = sim.grid.x.min().item()
+    return sim, [xst, xst + 1]  # assume this is in turbine-normalized coordinates
+
+
 def _read_inflow_profile_LES(sim: pio.BudgetIO, xlim=None, ylim=None, zlim=None):
     """
     Reads and y-averages the inflow profile (ubar, vbar, wbar, Tbar, tke, U
@@ -124,11 +158,8 @@ def _read_inflow_profile_LES(sim: pio.BudgetIO, xlim=None, ylim=None, zlim=None)
     `inflow_LES` caches, since it's otherwise re-read from disk once per
     wake model in a `compute_cp`-style loop.
     """
-    if xlim is None:
-        xst = sim.grid.x.min().item()
-        xen = xst + 1  # assume this is in turbine-normalized coordinates
-        xlim = [xst, xen]
-    ds_base = sim.slice(
+    source, xlim = _inflow_source_and_xlim(sim, xlim)
+    ds_base = source.slice(
         budget_terms=["ubar", "vbar", "wbar", "uu", "vv", "ww", "Tbar"],
         xlim=xlim,
         ylim=ylim,
@@ -174,7 +205,8 @@ def inflow_LES(
     """
     use_cache = xlim is None and ylim is None and zlim is None and not return_ds
     if not use_cache:
-        ds_base = sim.slice(
+        source, xlim = _inflow_source_and_xlim(sim, xlim)
+        ds_base = source.slice(
             budget_terms=["ubar", "vbar", "wbar", "uu", "vv", "ww"],
             xlim=xlim,
             ylim=ylim,
@@ -650,8 +682,10 @@ def get_wakemodel(wakemodel: str, inflow=None, **model_kwargs):
         _kws = {"windfield": inflow, **model_kwargs}
         wake_model = mitwf.VariableVortexWakeModel(**_kws)
     elif wakemodel == "gauss":
-        _kws = {"a": 0.636, "b": 0, "c": 0, **model_kwargs}
-        wake_model = mitwf.VariableKwGaussianWakeModel(**_kws)
+        # _kws = {"a": 0.636, "b": 0, "c": 0, **model_kwargs}
+        # wake_model = mitwf.VariableKwGaussianWakeModel(**_kws)
+        _kws = {"windfield": inflow, **model_kwargs}
+        wake_model = mitwf.VariableKwGaussBPWakeModel(**_kws)
     else:
         raise ValueError(f"Unknown wakemodel: {wakemodel}")
     return wake_model
