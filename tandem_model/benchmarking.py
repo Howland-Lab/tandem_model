@@ -412,6 +412,37 @@ class Benchmark:
         _df = self.compute_du_centerline(xax=xax)
         return aggregate_rmse(_df, key="du_centerline")
 
+    def compute_dk_max(self, xax=None):
+        """
+        Compute maximum wake-added TKE between LES and wake models for all cases.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame containing maximum dk as a function of x for
+            each model and case
+        """
+        records = []
+        for benchmark in self.cases:
+            ref = benchmark.ref
+            xax = ref.grid.x.sel(x=slice(0, None)).to_numpy() if xax is None else xax
+            xax = xax[xax <= ref.grid.x.max().item()]
+
+            # compute for models:
+            for name, model in benchmark.model_cache_ref.items():
+                dk_max = model.dk.max(("y", "z")).interp(x=xax)
+                records.append(
+                    pl.DataFrame(
+                        {
+                            "case": benchmark.name,
+                            "model": name,
+                            "x": xax,
+                            "dk_max": dk_max.to_numpy(),
+                        }
+                    )
+                )
+        return pl.concat(records)
+
     def print(self, *args):
         if self.verbose:
             print(*args)
