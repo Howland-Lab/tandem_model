@@ -15,9 +15,13 @@ import matplotlib.pyplot as plt
 from tandem_model import figuresettings
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
-from tandem_model.generate.streamtube_sbl import streamtube_sbl, MODELS
+from tandem_model.generate.streamtube_sbl import streamtube_sbl
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
+
+# subset of generate.streamtube_sbl.MODELS (which now also includes the
+# models only needed for the RMSE bar chart) to draw as line-plot panels here
+PLOT_MODELS = ["varvortex", "tandem"]
 
 
 def main(regenerate=False):
@@ -25,8 +29,8 @@ def main(regenerate=False):
     cr_values = sorted(df["Cr"].unique().to_list())
     palette = dict(zip(cr_values, sns.color_palette("crest", n_colors=len(cr_values))))
 
-    fig, axs = plt.subplots(ncols=len(MODELS), figsize=(6, 2), sharex=True, sharey=True)
-    for k, (name, ax) in enumerate(zip(MODELS, axs)):
+    fig, axs = plt.subplots(ncols=len(PLOT_MODELS), figsize=(6, 2), sharex=True, sharey=True)
+    for k, (name, ax) in enumerate(zip(PLOT_MODELS, axs)):
         sub = df.filter(pl.col("source").is_in([name, "LES"]), pl.col("x") >= 1)
         for cr, group in sub.group_by("Cr", maintain_order=True):
             color = palette[cr]
@@ -73,4 +77,4 @@ def main(regenerate=False):
 
 
 if __name__ == "__main__":
-    main(False)
+    main(True)

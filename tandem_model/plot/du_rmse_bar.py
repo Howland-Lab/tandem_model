@@ -17,13 +17,13 @@ from tandem_model import figuresettings
 from tandem_model.figuresettings import MODEL_COLORS
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
-from tandem_model.generate.streamtube_du_rmse import streamtube_du_rmse, MODELS
+from tandem_model.generate.du_rmse import du_rmse, MODELS
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
 
 
-def main(regenerate=False):
-    df = streamtube_du_rmse(regenerate=regenerate).with_columns(
+def main(key="du_avg_rmse", regenerate=False):
+    df = du_rmse(regenerate=regenerate).with_columns(
         pl.format("{}", pl.col("Cr")).alias("Cr_label")
     )
     cr_order = [f"{cr:g}" for cr in sorted(df["Cr"].unique().to_list())]
@@ -33,7 +33,7 @@ def main(regenerate=False):
     sns.barplot(
         df.to_pandas(),
         x="Cr_label",
-        y="du_avg_rmse",
+        y=key,
         hue="model",
         order=cr_order,
         hue_order=MODELS,
@@ -57,12 +57,12 @@ def main(regenerate=False):
     )
     plt.subplots_adjust(right=0.78)
 
-    figuresettings.save()
+    figuresettings.save(f"{key}_bar")
     plt.close()
 
-    print("MEAN RMSE: ")
-    print(df.groupby("model").agg(pl.mean("du_avg_rmse")).sort("du_avg_rmse"))
+    print("MEAN RMSE:", key)
+    print(df.group_by("model").agg(pl.mean(key)).sort(key))
 
 
 if __name__ == "__main__":
-    main(False)
+    main(key="du_centerline_rmse", regenerate=False)
