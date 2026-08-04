@@ -23,7 +23,9 @@ FIGPATH.mkdir(exist_ok=True, parents=True)
 
 def main(regenerate=False):
     df = ghost_turbine_power(regenerate=regenerate).with_columns(
-        pl.format("{}", pl.col("Cr")).alias("Cr_label")
+        pl.format("{}", pl.col("Cr")).alias("Cr_label"),
+        pl.col("power_err").abs(),
+        pl.col("power_err_rel").abs(),
     )
     cr_order = [f"{cr:g}" for cr in sorted(df["Cr"].unique().to_list())]
     palette = {m: MODEL_COLORS[m] for m in MODELS}
@@ -37,7 +39,7 @@ def main(regenerate=False):
         order=cr_order,
         hue_order=MODELS,
         palette=palette,
-        errorbar=("sd", 2),
+        errorbar=("pi", 50),
         capsize=0.3,
         err_kws=dict(linewidth=0.8),
         ax=ax,
@@ -63,7 +65,12 @@ def main(regenerate=False):
     plt.close()
 
     print("MEAN ERRORS: ")
-    print(df.groupby("model").agg(pl.mean("power_err_rel")).sort("power_err_rel"))
+    print(
+        df.group_by("model")
+        .with_columns(pl.col("power_err_rel").abs())
+        .agg(pl.mean("power_err_rel"))
+        .sort("power_err_rel")
+    )
 
 
 if __name__ == "__main__":

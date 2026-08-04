@@ -65,7 +65,7 @@ def main(regenerate=False, cr=0.5):
             if j == 0:
                 ax.set_ylabel(r"$\frac{z-z_h}{D}$")
                 ax.text(
-                    -0.7,
+                    -0.8,
                     0.5,
                     DISPLAY_NAMES.get(name, name),
                     fontsize=8,
@@ -127,6 +127,6 @@ def main_xy(regenerate=False, cr_values=(0.1, 0.3, 0.5)):
 
 
 if __name__ == "__main__":
-    main(True, 0.1)
+    main(False, 0.1)
     main(False, 0.5)
     # main_xy(False)

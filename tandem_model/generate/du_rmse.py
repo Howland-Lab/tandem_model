@@ -19,7 +19,7 @@ import polars as pl
 from tandem_model import caching as cache, constants
 from tandem_model.generate.streamtube_sbl import streamtube_sbl, MODELS
 
-METRICS = ["du_avg", "du_min", "du_centerline", "du_rews"]
+METRICS = ["du_avg", "du_min", "du_centerline", "du_rews", "dk_max"]
 XLIM = (5, 15)
 
 

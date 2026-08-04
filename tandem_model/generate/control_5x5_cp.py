@@ -29,6 +29,13 @@ from tandem_model.models import curled_kwargs
 MODELS = ("gauss", "varvortex", "kl-hub", "tandem")
 
 CASES = ["nocontrol", "yawcontrol"]
+ROW_MAPPING = {
+    **dict.fromkeys([0, 5, 10, 15, 20, 21, 22, 23, 24], 1),
+    **dict.fromkeys([1, 6, 11, 16, 17, 18, 19], 2),
+    **dict.fromkeys([2, 7, 12, 13, 14], 3),
+    **dict.fromkeys([3, 8, 9], 4),
+    **dict.fromkeys([4], 5),
+}
 
 
 def compute_cp(dirname, models=MODELS, runid=5):
@@ -44,12 +51,10 @@ def compute_cp(dirname, models=MODELS, runid=5):
     print("Computing Cp for 5x5 wind farm: ", dirname.name)
     df_les = utils.to_polars(sim).with_columns(pl.lit("LES").alias("model"))
     df_list = [df_les]
-    # Cp_normfact_model = Momentum.UnifiedMomentum()(2.0, 0).Cp  # normalize by Betz limit
-    # Cp_normfact_les = 0.6186  # df_les["Cp"].max()  # normalize by leading Cp in the LES no control
-    # df_les = df_les.with_columns((pl.col("Cp") / Cp_normfact_les).alias("Pnorm"))
 
     # modeling stuff: 
-    fw = sim.ta[0].filterwidth / np.sqrt(12)
+    # fw = sim.ta[0].filterwidth / np.sqrt(12)
+    fw = 0.05
     rotor_model = mitwf.UnifiedAD_veer(rotor_grid=mitwf.Area())
 
     for key in models:
@@ -127,7 +132,10 @@ def cp_5x5(cases=CASES, models=MODELS, regenerate=False):
     for case in cases:
         df = cp(parent / case, models=models, regenerate=regenerate)
         df_list.append(df.with_columns(pl.lit(case).alias("case")))
-    return pl.concat(df_list, how="diagonal_relaxed")
+
+    return pl.concat(df_list, how="diagonal_relaxed").with_columns(
+        pl.col("turbine").replace(ROW_MAPPING, default=None).alias("Row"),
+    )
 
 
 if __name__ == "__main__":

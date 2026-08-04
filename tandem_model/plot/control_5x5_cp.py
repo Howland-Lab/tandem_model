@@ -28,7 +28,7 @@ Pnorm_model = Momentum.UnifiedMomentum()(2.0, 0).Cp
 def main(regenerate=False):
     df = cp_5x5(regenerate=regenerate)
     les = df.filter(pl.col("model") == "LES")
-    Pnorm_les = les.filter(case="nocontrol")["Cp"].max()
+    Pnorm_les = les.filter(case="nocontrol", Row=1)["Cp"].mean()
     les = les.with_columns(  # add pnorm column
         (pl.col("Cp") / Pnorm_les).alias("Pnorm")
     ).select("case", "turbine", pl.col("Pnorm").alias("Pnorm_les"))
@@ -69,4 +69,4 @@ def main(regenerate=False):
 
 
 if __name__ == "__main__":
-    main(False)
+    main(True)

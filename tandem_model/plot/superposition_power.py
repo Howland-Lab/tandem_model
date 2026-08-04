@@ -23,10 +23,10 @@ from tandem_model.generate.superposition_power import power_4x1, MODELS, CASES
 FIGPATH.mkdir(exist_ok=True, parents=True)
 
 LABELS = {
-    "CNBL_4x1_wd000": "Wind direction 0°",
-    "CNBL_4x1_wd025": "Wind direction 2.5°",
-    "CNBL_4x1_wd050": "Wind direction 5°",
-    "CNBL_4x1_wd100": "Wind direction 10°",
+    "CNBL_4x1_wd000": r"$0^\circ$",
+    "CNBL_4x1_wd025": r"$2.5^\circ$",
+    "CNBL_4x1_wd050": r"$5^\circ$",
+    "CNBL_4x1_wd100": r"$10^\circ$",
 }
 MODELS_PLOT = ("LES",) + MODELS
 
@@ -40,10 +40,10 @@ def main(regenerate=False):
     # budgets yet); only plot what's actually available.
     present_cases = [case for case in CASES if case in df["case"].unique().to_list()]
 
-    fig, axarr = plt.subplots(2, 2, figsize=(6.5, 4.5), sharex=True, sharey=True)
+    fig, axarr = plt.subplots(2, 2, figsize=(4, 3), sharex=True, sharey=True)
     for ax in axarr.flat[len(present_cases):]:
         ax.set_visible(False)
-    for ax, case in zip(axarr.flat, present_cases):
+    for k, (ax, case) in enumerate(zip(axarr.flat, present_cases)):
         sns.lineplot(
             df.filter(df["case"] == case),
             x="row",
@@ -57,12 +57,13 @@ def main(regenerate=False):
             dashes=False,
             ax=ax,
         )
-        ax.set_title(LABELS.get(case, case))
+        # ax.set_title(LABELS.get(case, case))
         ax.legend_.remove()
         # ax.set_ylim([0, 1.09])
         ax.set_xlabel("Row")
         ax.set_ylabel("$P/P_1$")
         ax.set_xticks(sorted(df["row"].unique().to_list()))
+        ax.text(0, 1.02, f"(${chr(97 + k)}$) {LABELS.get(case, case)}", transform=ax.transAxes, ha="left", va="bottom")
 
     handles, labels = ax.get_legend_handles_labels()
     labels = [DISPLAY_NAMES.get(label, label) for label in labels]
@@ -71,7 +72,7 @@ def main(regenerate=False):
         labels,
         loc="upper center",
         ncol=len(MODELS_PLOT),
-        bbox_to_anchor=(0.5, 1.05),
+        bbox_to_anchor=(0.5, 1.07),
     )
     plt.subplots_adjust(hspace=0.3, wspace=0.1)
 
@@ -80,4 +81,4 @@ def main(regenerate=False):
 
 
 if __name__ == "__main__":
-    main(True)
+    main(False)

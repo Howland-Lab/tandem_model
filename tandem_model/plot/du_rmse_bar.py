@@ -20,10 +20,17 @@ from tandem_model.models import DISPLAY_NAMES
 from tandem_model.generate.du_rmse import du_rmse, MODELS
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
+YLABELS = {
+    "du_avg_rmse": r"RMSE $\langle \overline{\Delta u} \rangle / U_h$",
+    "du_centerline_rmse": r"RMSE $\overline{\Delta u}_c/ U_h$",
+    "du_min_rmse": r"RMSE $\overline{\Delta u}_\mathrm{min}/ U_h$",
+    "du_rews_rmse": r"RMSE $\langle \overline{\Delta u}_\mathrm{rews} \rangle / U_h$",
+    "dk_max_rmse": r"RMSE $\Delta k_\mathrm{max}/ U_h^2$",
+}
 
 
-def main(key="du_avg_rmse", regenerate=False):
-    df = du_rmse(regenerate=regenerate).with_columns(
+def main(key="du_avg_rmse", regenerate=False, regenerate_sbl=False):
+    df = du_rmse(regenerate=regenerate, regenerate_sbl=regenerate_sbl).with_columns(
         pl.format("{}", pl.col("Cr")).alias("Cr_label")
     )
     cr_order = [f"{cr:g}" for cr in sorted(df["Cr"].unique().to_list())]
@@ -43,7 +50,7 @@ def main(key="du_avg_rmse", regenerate=False):
     )
 
     ax.set_xlabel(r"$C_r$ (K~hr$^{-1}$)")
-    ax.set_ylabel(r"RMSE $\langle \overline{\Delta u} \rangle / U_h$")
+    ax.set_ylabel(YLABELS.get(key, r"RMSE $\overline{\Delta u}/ U_h$"))
 
     handles, labels = ax.get_legend_handles_labels()
     labels = [DISPLAY_NAMES.get(label, label) for label in labels]
@@ -66,3 +73,6 @@ def main(key="du_avg_rmse", regenerate=False):
 
 if __name__ == "__main__":
     main(key="du_centerline_rmse", regenerate=False)
+    main(key="du_min_rmse", regenerate=False)
+    main(key="du_avg_rmse", regenerate=False)
+    main(key="dk_max_rmse", regenerate=False)

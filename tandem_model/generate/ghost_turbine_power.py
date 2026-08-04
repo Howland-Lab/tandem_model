@@ -85,8 +85,8 @@ def compute_ghost_turbine_error(df):
         df.filter(pl.col("model") != "LES")
         .join(ref, on=["case", "x", "y"])
         .with_columns(
-            (pl.col("power") - pl.col("power_les")).abs().alias("power_err"),
-            ((pl.col("power") - pl.col("power_les")).abs() / pl.col("power_les")).alias(
+            (pl.col("power") - pl.col("power_les")).alias("power_err"),
+            ((pl.col("power") - pl.col("power_les")) / pl.col("power_les")).alias(
                 "power_err_rel"
             ),
         )

@@ -38,13 +38,13 @@ def main(regenerate=False):
                 line = group.filter(pl.col("source") == source).sort("x")
                 ax.plot(
                     line["x"],
-                    line["du_avg"],
+                    line["du_centerline"],
                     color=color,
                     ls=ls,
                     label=f"${cr:.1f}$" if source == "LES" else None,
                 )
 
-        ax.set_ylim([-0.49, 0.02])
+        ax.set_ylim([-0.54, 0.02])
         ax.set_xlabel("$x/D$")
         ax.set_title(
             f"(${chr(97 + k)}$) {DISPLAY_NAMES.get(name, name)}",
@@ -54,7 +54,7 @@ def main(regenerate=False):
         )
 
     axs[0].set_ylabel(
-        r"$\langle \overline{\Delta u} \rangle / U_\mathrm{h}$"
+        r"$\overline{\Delta u}_c / U_\mathrm{h}$"
     )
 
     plt.subplots_adjust(wspace=0.1, right=0.8)

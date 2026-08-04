@@ -19,6 +19,7 @@ Kirby Heck
 from pathlib import Path
 import padeopsIO as pio
 import polars as pl
+import numpy as np
 
 from tandem_model import caching as cache, constants, utils
 from tandem_model.benchmarking import Benchmark
@@ -29,6 +30,7 @@ ABL_DIRNAMES = [
     constants.SCRATCH_ROOT / "sbl" / f"G_01_z0_02_dTsurf_dt_{i:02d}" for i in range(6)
 ]
 SBL_DIRNAMES = ABL_DIRNAMES[1:]
+CTP_DIRNAMES = [constants.SCRATCH_ROOT / "oneturbine" / f"yaw_00_ct_{i:02d}" for i in np.arange(1, 20, 2)]
 
 MODELS = ["gauss", "varvortex", "2021", "scott", "kl-hub", "tandem"]
 
@@ -79,15 +81,16 @@ def compute_streamtube_sbl(dirnames=SBL_DIRNAMES, models=MODELS, runid=5):
     )
 
     on = ["case", "model", "x"]
+    
     df = (
         bm.compute_streamtube_du()
         .join(bm.compute_du_min(), on=on)
         .join(bm.compute_du_centerline(), on=on)
         .join(_compute_du_rews(bm), on=on)
+        .join(bm.compute_dk_max(), on=on)
     )
     df = df.with_columns(
         pl.col("model").replace({"ref": "LES"}).alias("source"),
-        pl.col("case").map_elements(parse_cooling_rate, return_dtype=pl.Float64).alias("Cr"),
     ).drop("model")
 
     # Null out the trailing x-sample of du_avg for curled (parabolized RANS)
@@ -119,8 +122,37 @@ def streamtube_sbl(dirnames=SBL_DIRNAMES, models=MODELS, regenerate=False):
     def _generate(regenerate=False):
         return compute_streamtube_sbl(dirnames=dirnames, models=models)
 
-    return _generate(regenerate=regenerate)
+    df = _generate(regenerate=regenerate).with_columns(
+        pl.col("case")
+        .map_elements(parse_cooling_rate, return_dtype=pl.Float64)
+        .alias("Cr"),
+    )
+    return df
+
+
+def thrust_wakes(dirnames=CTP_DIRNAMES, models=MODELS, regenerate=False):
+    """
+    Computes (or loads from cache) streamtube-averaged, minimum, centerline,
+    and ghost-turbine-REWS deficit vs x for SBL cases. Cached at
+    data/sbl/streamtube_du.csv.
+    """
+    cache_file = constants.DATA_PATH / "oneturbine" / "streamtube_du.csv"
+
+    @cache.cache_polars(cache_file)
+    def _generate(regenerate=False):
+        return compute_streamtube_sbl(dirnames=dirnames, models=models)
+
+    df = _generate(regenerate=regenerate).with_columns(
+        pl.col("case")
+        .map_elements(
+            lambda x: float(x.split("ct_")[1]) * 0.2 + 0.2, return_dtype=float
+        )
+        .round(1)
+        .alias("Ctprime"),
+    )
+    return df
 
 
 if __name__ == "__main__":
     print(streamtube_sbl(regenerate=True))
+    print(thrust_wakes(regenerate=True))

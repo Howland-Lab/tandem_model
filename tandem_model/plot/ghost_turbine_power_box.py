@@ -47,7 +47,7 @@ def main(regenerate=False):
     ax.axhline(0, color="k", lw=0.5)
     ax.set_xlabel(r"$C_r$ (K~hr$^{-1}$)")
     ax.set_ylabel(r"$(P_\mathrm{model} - P_\mathrm{LES}) / P_\mathrm{LES}$")
-    ax.set_ylim([0, ax.get_ylim()[1]])
+    # ax.set_ylim([0, ax.get_ylim()[1]])
 
     for cr in cr_order[:-1]:
         ax.axvline(
@@ -74,7 +74,7 @@ def main(regenerate=False):
     plt.close()
 
     print("MEAN ERRORS: ")
-    print(df.groupby("model").agg(pl.mean("power_err_rel")).sort("power_err_rel"))
+    print(df.group_by("model").agg(pl.mean("power_err_rel")).sort("power_err_rel"))
 
 
 if __name__ == "__main__":
