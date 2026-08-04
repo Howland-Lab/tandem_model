@@ -29,6 +29,7 @@ MODELS = ("gauss", "kl-hub", "tandem")
 # CNBL_4x1_wd{:03d}: 4-row wind farms at 0, 2.5, 5, 10 degrees wind direction
 # (directory suffix = wind direction in degrees x10).
 CASES = ["CNBL_4x1_wd000", "CNBL_4x1_wd025", "CNBL_4x1_wd050", "CNBL_4x1_wd100"]
+CASE10 = "CNBL_10x1_wd000"
 
 
 def add_pnorm(df, cp_normfact=None):
@@ -47,14 +48,13 @@ def compute_power(dirname, models=MODELS, runid=5):
     """
     dirname = Path(dirname)
     sim = pio.BudgetIO(dirname, padeops=True, runid=runid, normalize_origin="turb")
-    fw = sim.ta[0].filterwidth / np.sqrt(12)
     rotor_model = mitwf.UnifiedAD_veer(rotor_grid=mitwf.Area())
 
     df_list = [add_pnorm(utils.to_polars(sim)).with_columns(pl.lit("LES").alias("model"))]
     for key in models:
         kw = curled_kwargs(key)
         if kw:  # parabolized (curled) RANS turbulence closure
-            kw["model_kwargs"] = {**kw["model_kwargs"], "smooth_fact": fw}
+            kw["model_kwargs"] = {**kw["model_kwargs"]}
             wake = utils.solve_windfarm_LES(sim, rotor_model=rotor_model, wakemodel=key, **kw)
         else:
             wake = utils.solve_windfarm_LES(sim, rotor_model=rotor_model, wakemodel=key)
@@ -93,13 +93,21 @@ def power_4x1(cases=CASES, models=MODELS, regenerate=False):
     df_list = []
     for case in cases:
         df = power(parent / case, models=models, regenerate=regenerate)
-        # try:
-        # except AttributeError as e:  # e.g. a case still running with no budgets written yet
-        #     print(f"Skipping {case}: {e}")
-        #     continue
         df_list.append(df.with_columns(pl.lit(case).alias("case")))
     return pl.concat(df_list, how="diagonal_relaxed")
 
 
+def power_10x1(case=CASE10, models=MODELS, regenerate=False):
+    """
+    Computes/loads normalized power vs. x for each CNBL 10x1 wind-direction
+    case in `constants.SCRATCH_ROOT / "superposition"`, concatenated into one
+    DataFrame tagged by a `case` column (the case directory's name).
+    """
+    parent = constants.SCRATCH_ROOT / "superposition"
+    df = power(parent / case, models=models, regenerate=regenerate).with_columns(pl.lit(case).alias("case"))
+    return df
+
+
 if __name__ == "__main__":
     print(power_4x1(regenerate=True))
+    print(power_10x1(regenerate=True))
