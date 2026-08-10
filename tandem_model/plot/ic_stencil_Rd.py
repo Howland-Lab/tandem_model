@@ -102,7 +102,7 @@ def plot_ic_schematic(ax, Ctprime=2.0, sigma_diff=SIGMA_0, smooth_fact=0.1):
         xy=(-Rd, ic.min() * 1.04),
         arrowprops=dict(arrowstyle="<|-|>", facecolor="k", shrinkA=0, shrinkB=0),
     )
-    ax.annotate("$R_d$", xy=(0, ic.min() * 0.95), ha="center", va="bottom", fontsize=12)
+    ax.annotate("$R^\\mathrm{corr}_d$", xy=(0, ic.min() * 0.95), ha="center", va="bottom", fontsize=12)
     ax.axvspan(-Rd, Rd, color="k", alpha=0.1, zorder=-1)
     ax.axvspan(-Rd - smooth_fact, Rd + smooth_fact, color="k", alpha=0.1, zorder=-1)
     ax.axvspan(-Rd + smooth_fact, Rd - smooth_fact, color="k", alpha=0.1, zorder=-1)
@@ -159,10 +159,10 @@ def main():
 
     # plot schematic first
     plot_ic_schematic(axs[0])
-    sns.lineplot(df, x="ctps", y="Rd", hue="sigma_IC", palette="crest_r", ax=axs[1], legend=False)
+    sns.lineplot(df, x="ctps", y="Rd", hue="sigma_IC", palette="cividis", ax=axs[1], legend=False)
     axs[2].sharey(axs[1])
-    sns.lineplot(df, x="Ct", y="Rd", hue="sigma_IC", palette="crest_r", ax=axs[2], legend=True)
-    axs[1].set_ylabel("$R_d/D$")
+    sns.lineplot(df, x="Ct", y="Rd", hue="sigma_IC", palette="cividis", ax=axs[2], legend=True)
+    axs[1].set_ylabel("$R^\\mathrm{corr}_d/D$")
     axs[1].set_xlabel("$C_T'$")
     axs[2].set_xlabel("$C_T$")
     axs[2].set_ylabel("")
