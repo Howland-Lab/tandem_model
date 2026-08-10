@@ -21,16 +21,17 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from tandem_model import figuresettings  # noqa: F401
-from tandem_model.figuresettings import MODEL_COLORS, MODEL_MARKERS
+from tandem_model.figuresettings import MODEL_COLORS, MODEL_MARKERS, MODEL_DASHES
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
-from tandem_model.generate.superposition_power import power_10x1, MODELS as POWER_MODELS
+from tandem_model.generate.superposition_power import power_10x1
 from tandem_model.generate.superposition_dk import dk_10x1
 from tandem_model.generate.superposition_du import du_centerline_10x1
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
 
-MODELS_PLOT = ("LES",) + POWER_MODELS  # LES, gauss, kl-hub, tandem
+MODELS_PLOT = ("LES", "gauss", "kl-hub", "tandem")
+MODELS_PLOT2 = ("LES", "kl-hub", "tandem")
 DK_MODELS = ("gauss", "kl-hub", "tandem")  # computed for consistency; gauss excluded below
 DK_EXCLUDE = "gauss"
 MARGIN = 2.0  # extra space (x/D) before/after the turbine array on the shared x-axis
@@ -52,7 +53,7 @@ def main(regenerate=False):
     palette = {m: MODEL_COLORS[m] for m in MODELS_PLOT}
     markers = {m: MODEL_MARKERS[m] for m in MODELS_PLOT}
 
-    fig, axs = plt.subplots(3, 1, figsize=(5, 4.5), height_ratios=(1.3, 1, 1), layout="constrained")
+    fig, axs = plt.subplots(3, 1, figsize=(3.25, 4.5), height_ratios=(1.3, 1, 1), layout="constrained")
     axs[1].sharex(axs[2])
 
     # --- (a) power vs row ---
@@ -66,7 +67,9 @@ def main(regenerate=False):
         style="model",
         style_order=MODELS_PLOT,
         markers=markers,
-        dashes=False,
+        markersize=5,
+        alpha=0.8,
+        dashes=MODEL_DASHES,
         ax=axs[0],
     )
     axs[0].set_xlabel("Row")
@@ -77,12 +80,14 @@ def main(regenerate=False):
 
     # --- (b) centerline du ---
     sns.lineplot(
-        du,
+        du.filter(pl.col("model") != DK_EXCLUDE),
         x="x",
         y="du_centerline",
         hue="model",
-        hue_order=MODELS_PLOT,
+        hue_order=MODELS_PLOT2,
         palette=palette,
+        style="model",
+        dashes=MODEL_DASHES,
         ax=axs[1],
     )
     axs[1].set_ylabel(r"$\overline{\Delta u}_c / U_h$")
@@ -90,17 +95,18 @@ def main(regenerate=False):
     axs[1].tick_params(labelbottom=False)
     axs[1].set_xlabel("")
     axs[1].set_ylim([-0.86, 0.01])
-    axs[1].set_yticks([-0.8, -0.6, -0.4, -0.2, 0])
+    axs[1].set_yticks([-0.8, -0.4, 0])
 
     # --- (c) integrated dk ---
-    dk_order = [m for m in MODELS_PLOT if m in dk["model"].unique().to_list()]
     sns.lineplot(
         dk,
         x="x",
         y="dk_int",
         hue="model",
-        hue_order=dk_order,
+        hue_order=MODELS_PLOT2,
         palette=palette,
+        style="model",
+        dashes=MODEL_DASHES,
         ax=axs[2],
     )
     axs[2].set_xlabel("$x/D$")
@@ -122,17 +128,21 @@ def main(regenerate=False):
 
     for k, ax in enumerate((axs[0], axs[1], axs[2])):
         ax.text(
-            0, 1.05, f"(${chr(97 + k)}$)", fontsize=10, va="bottom", ha="center",
+            0, 1.03, f"(${chr(97 + k)}$)", fontsize=10, va="bottom", ha="center",
             transform=ax.transAxes,
         )
 
     handles, labels = axs[0].get_legend_handles_labels()
     labels = [DISPLAY_NAMES.get(label, label) for label in labels]
-    axs[0].legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 1.02), ncols=len(handles))
+    axs[0].legend(handles, labels, loc="upper right", bbox_to_anchor=(1, 1), ncols=2, fontsize=8, frameon=False)
+
+    handles, labels = axs[1].get_legend_handles_labels()
+    labels = [DISPLAY_NAMES.get(label, label) for label in labels]
+    axs[1].legend(handles, labels, loc="lower right", bbox_to_anchor=(1, 1), ncols=len(labels), fontsize=8, frameon=False)
 
     figuresettings.save()
     plt.close()
 
 
 if __name__ == "__main__":
-    main(False)
+    main(True)
