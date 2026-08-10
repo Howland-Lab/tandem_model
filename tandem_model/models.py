@@ -40,7 +40,7 @@ CURLED_YLIM, CURLED_ZLIM = [-6, 6], [-2, 2]
 # models; keys present here are treated as curled models. Add new models'
 # k_kwargs here (empty dict for defaults, e.g. "kl-hub": {}).
 K_KWARGS = {
-    "tandem": dict(C_nu=0.35, l_eps=0.78, C_w=3),
+    "tandem": dict(C_nu=0.35, l_eps=0.78, C_w=4),
     "scott": {},  # use default A, sigma
     "kl-hub": {},  # use default C_nu, C_k1, C_k2
     "2021": {},  # use default C, kappa; Ro is injected from LES metadata
