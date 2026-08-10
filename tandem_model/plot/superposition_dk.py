@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 from tandem_model import figuresettings
-from tandem_model.figuresettings import MODEL_COLORS
+from tandem_model.figuresettings import MODEL_COLORS, MODEL_DASHES
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
 from tandem_model.generate.superposition_dk import dk_4x1, MODELS, CASES
@@ -49,6 +49,8 @@ def main(regenerate=False):
             y="dk_int",
             hue="source",
             hue_order=MODELS_PLOT,
+            style="source",
+            dashes=MODEL_DASHES,
             palette=palette,
             ax=ax,
         )
