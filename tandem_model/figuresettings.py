@@ -36,7 +36,6 @@ FIGPATH = BASE / "figs"
 MODEL_COLORS = {
     "LES": "k",
     "gauss": "tab:red",
-    # "VortexSheet": "tab:red",
     "varvortex": "tab:orange",
     "2021": sns.color_palette("mako", n_colors=5)[4],
     "scott": "#289b60",
@@ -46,21 +45,20 @@ MODEL_COLORS = {
 
 MODEL_DASHES = {
     "LES": (1, 0),
-    "gauss": (2, 2),
-    # "VortexSheet": (1, 3),
-    "varvortex": (1, 1),
+    "gauss": (1, 1, 3, 1),
+    "varvortex": (2, 2),
     "2021": (3, 3),
-    "scott": (3, 1),
-    "tandem": (3, 1, 3),
-    "kl-hub": (1, 1, 3, 1),
+    "scott": (3, 1, 3),
+    "tandem": (4, 1),
+    "kl-hub": (1, 1),
 }
 
 MODEL_MARKERS = {
     "LES": ",",
     "gauss": "s",
-    # "VortexSheet": "P",
     "varvortex": "X",
     "2021": "^",
+    "scott": "v",
     "kl-hub": "^",
     "tandem": "o",
 }
