@@ -24,7 +24,7 @@ import mitwindfarm as mitwf
 from tandem_model import caching as cache, constants, utils
 from tandem_model.models import curled_kwargs
 
-MODELS = ("gauss", "kl-hub", "tandem")
+MODELS = ("gauss", "2021", "scott", "kl-hub", "tandem")
 
 # CNBL_4x1_wd{:03d}: 4-row wind farms at 0, 2.5, 5, 10 degrees wind direction
 # (directory suffix = wind direction in degrees x10).
