@@ -30,7 +30,7 @@ FIGPATH.mkdir(exist_ok=True, parents=True)
 ORDER = ["LES", *MODELS]  # legend/bar order: LES first, then generate.MODELS order
 MODEL_LABELS = {m: DISPLAY_NAMES.get(m, m) for m in ORDER}
 PALETTE = {MODEL_LABELS[m]: MODEL_COLORS[m] for m in ORDER}
-CASE_LABELS = {"nocontrol": "No control", "yawcontrol": "Yaw control"}
+CASE_LABELS = {"nocontrol": "Greedy control", "yawcontrol": "Wake steering"}
 Pnorm_model = Momentum.UnifiedMomentum()(2.0, 0).Cp
 
 
@@ -136,16 +136,17 @@ def main(regenerate=False):
         handles,
         labels,
         loc="upper center",
-        bbox_to_anchor=(0.5, 1.07),
+        bbox_to_anchor=(0.5, 1.02),
         ncol=len(ORDER),
-        fontsize=8,
-        title="Model",
-        title_fontsize=8,
+        fontsize=9,
     )
 
     plt.subplots_adjust(wspace=0.35, top=0.8)
     figuresettings.save()
     plt.close()
+
+    print(df_agg)
+    print(gain)
 
 
 if __name__ == "__main__":

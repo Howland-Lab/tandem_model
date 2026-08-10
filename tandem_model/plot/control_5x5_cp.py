@@ -51,10 +51,15 @@ def main(regenerate=False):
                 alpha=0.6,
                 label=f"{DISPLAY_NAMES.get(name, name)} (MAE = {mae:.3f})",
             )
-        lims = np.array([0.42, 1.09])
+        lims = np.array([0.47, 1.05])
+        ticks = [0.5, 0.75, 1.0]
+        # ticks = np.arange(0.5, 1.01, 0.1)
         ax.plot(lims, lims, "k--", lw=0.5, zorder=-1)
         ax.set_xlim(lims)
         ax.set_ylim(lims)
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
+        ax.grid(True, which="both", ls=":", lw=0.5, alpha=0.5)
         ax.set_aspect(1)
         ax.set_xlabel(r"LES $P/P_\mathrm{Betz}$")
         ax.set_title(LABELS.get(case, case), fontsize=10,)
@@ -69,4 +74,4 @@ def main(regenerate=False):
 
 
 if __name__ == "__main__":
-    main(True)
+    main(False)
