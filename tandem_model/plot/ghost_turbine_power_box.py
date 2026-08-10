@@ -25,7 +25,7 @@ def main(regenerate=False):
     df = ghost_turbine_power(regenerate=regenerate).with_columns(
         pl.format("{}", pl.col("Cr")).alias("Cr_label")
     )
-    cr_order = [f"{cr:g}" for cr in sorted(df["Cr"].unique().to_list())]
+    cr_order = [f"{cr:.1f}" for cr in sorted(df["Cr"].unique().to_list())]
     palette = {m: MODEL_COLORS[m] for m in MODELS}
 
     fig, ax = plt.subplots(figsize=(6, 3))
@@ -74,8 +74,12 @@ def main(regenerate=False):
     plt.close()
 
     print("MEAN ERRORS: ")
-    print(df.group_by("model").agg(pl.mean("power_err_rel")).sort("power_err_rel"))
-
+    print(
+        df.with_columns(pl.col("power_err_rel").abs())
+        .group_by("model")
+        .agg(pl.mean("power_err_rel"))
+        .sort("power_err_rel")
+    )
 
 if __name__ == "__main__":
     main(False)

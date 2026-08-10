@@ -29,7 +29,7 @@ from tandem_model.models import K_KWARGS, curled_kwargs
 ABL_DIRNAMES = [
     constants.SCRATCH_ROOT / "sbl" / f"G_01_z0_02_dTsurf_dt_{i:02d}" for i in range(6)
 ]
-SBL_DIRNAMES = ABL_DIRNAMES[1:]
+SBL_DIRNAMES = ABL_DIRNAMES  # [1:]
 CTP_DIRNAMES = [constants.SCRATCH_ROOT / "oneturbine" / f"yaw_00_ct_{i:02d}" for i in np.arange(1, 20, 2)]
 
 MODELS = ["gauss", "varvortex", "2021", "scott", "kl-hub", "tandem"]

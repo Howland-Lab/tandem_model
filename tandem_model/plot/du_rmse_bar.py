@@ -33,7 +33,7 @@ def main(key="du_avg_rmse", regenerate=False, regenerate_sbl=False):
     df = du_rmse(regenerate=regenerate, regenerate_sbl=regenerate_sbl).with_columns(
         pl.format("{}", pl.col("Cr")).alias("Cr_label")
     )
-    cr_order = [f"{cr:g}" for cr in sorted(df["Cr"].unique().to_list())]
+    cr_order = [f"{cr:.1f}" for cr in sorted(df["Cr"].unique().to_list())]
     palette = {m: MODEL_COLORS[m] for m in MODELS}
 
     fig, ax = plt.subplots(figsize=(5, 2.5))
@@ -72,7 +72,7 @@ def main(key="du_avg_rmse", regenerate=False, regenerate_sbl=False):
 
 
 if __name__ == "__main__":
-    main(key="du_centerline_rmse", regenerate=False)
-    main(key="du_min_rmse", regenerate=False)
-    main(key="du_avg_rmse", regenerate=False)
-    main(key="dk_max_rmse", regenerate=False)
+    main(key="du_centerline_rmse", regenerate=True)
+    main(key="du_min_rmse", regenerate=True)
+    main(key="du_avg_rmse", regenerate=True)
+    main(key="dk_max_rmse", regenerate=True)

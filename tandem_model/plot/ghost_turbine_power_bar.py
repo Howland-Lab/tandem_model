@@ -66,8 +66,8 @@ def main(regenerate=False):
 
     print("MEAN ERRORS: ")
     print(
-        df.group_by("model")
-        .with_columns(pl.col("power_err_rel").abs())
+        df.with_columns(pl.col("power_err_rel").abs())
+        .group_by("model")
         .agg(pl.mean("power_err_rel"))
         .sort("power_err_rel")
     )
