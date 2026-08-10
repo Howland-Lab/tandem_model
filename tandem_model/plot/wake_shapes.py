@@ -73,7 +73,7 @@ def main(regenerate=False):
         ax.set_xlabel("$y/D$")
         ax.set_aspect(1)
 
-    axs[0].set_ylabel(r"$(z-z_\mathrm{h})/D$")
+    axs[0].set_ylabel(r"$(z-z_h)/D$")
 
     plt.subplots_adjust(wspace=0.1, right=0.8)
     axs[-1].legend(
