@@ -28,7 +28,7 @@ LABELS = {
     "CNBL_4x1_wd050": r"$5^\circ$",
     "CNBL_4x1_wd100": r"$10^\circ$",
 }
-MODELS_PLOT = ("LES",) + MODELS
+MODELS_PLOT = ("LES",) + ("gauss", "scott", "kl-hub", "tandem")  # only plot these models, in this order
 
 
 def main(regenerate=False):
@@ -40,7 +40,7 @@ def main(regenerate=False):
     # budgets yet); only plot what's actually available.
     present_cases = [case for case in CASES if case in df["case"].unique().to_list()]
 
-    fig, axarr = plt.subplots(2, 2, figsize=(4, 3), sharex=True, sharey=True)
+    fig, axarr = plt.subplots(2, 2, figsize=(5, 3), sharex=True, sharey=True)
     for ax in axarr.flat[len(present_cases):]:
         ax.set_visible(False)
     for k, (ax, case) in enumerate(zip(axarr.flat, present_cases)):
@@ -55,6 +55,8 @@ def main(regenerate=False):
             style_order=MODELS_PLOT,
             markers=markers,
             dashes=False,
+            markersize=4,
+            alpha=0.8,
             ax=ax,
         )
         # ax.set_title(LABELS.get(case, case))
@@ -70,9 +72,9 @@ def main(regenerate=False):
     fig.legend(
         handles,
         labels,
-        loc="upper center",
-        ncol=len(MODELS_PLOT),
-        bbox_to_anchor=(0.5, 1.07),
+        loc="center left",
+        bbox_to_anchor=(0.9, 0.5),
+        fontsize=8,
     )
     plt.subplots_adjust(hspace=0.3, wspace=0.1)
 
