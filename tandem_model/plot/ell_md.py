@@ -26,7 +26,7 @@ def main(regenerate=False):
 
     ax.set_xlabel(r"$\ell_\mathrm{md} / D$")
     ax.set_yticks([0, 0.05, 0.1])
-    ax.set_ylabel(r"$\ell/D = \nu_T / (D \sqrt{k})$")
+    ax.set_ylabel(r"$\ell_\mathrm{LES}/D = \nu_T / (D \sqrt{k})$")
     ax.legend()
 
     figuresettings.save()
