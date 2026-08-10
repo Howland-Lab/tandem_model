@@ -95,8 +95,8 @@ def main(regenerate=False, crs=CRS):
     cb.set_ticks([0, 0.01, 0.02])
     plt.subplots_adjust(left=0.2, right=0.76)
 
-    for k, ax in enumerate(axs.ravel()):
-        ax.text(0.02, 0.96, f"(${chr(97 + k)}$)", transform=ax.transAxes, fontsize=8, va="top", ha="left", color="w")
+    # for k, ax in enumerate(axs.ravel()):
+    #     ax.text(0.02, 0.96, f"(${chr(97 + k)}$)", transform=ax.transAxes, fontsize=8, va="top", ha="left", color="w")
 
     figuresettings.save()
     plt.close()
