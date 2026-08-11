@@ -41,6 +41,11 @@ MODEL_COLORS = {
     "scott": "#289b60",
     "tandem": sns.color_palette("mako", n_colors=5)[2],
     "kl-hub": "tab:purple",
+    # "reasonable variation" probes on the Gaussian model (models.py); kept
+    # in the same red family as "gauss" since they share its wake shape.
+    "gauss-quad": "lightcoral",
+    "gauss-lin": "firebrick",
+    "gauss-noti": "darksalmon",
 }
 
 MODEL_DASHES = {
@@ -51,6 +56,9 @@ MODEL_DASHES = {
     "scott": (3, 1, 3),
     "tandem": (4, 1),
     "kl-hub": (1, 1),
+    "gauss-quad": (1, 1),
+    "gauss-lin": (5, 1),
+    "gauss-noti": (2, 1, 1, 1),
 }
 
 MODEL_MARKERS = {
@@ -61,7 +69,36 @@ MODEL_MARKERS = {
     "scott": "v",
     "kl-hub": "^",
     "tandem": "o",
+    "gauss-quad": "*",
+    "gauss-lin": "P",
+    "gauss-noti": "D",
 }
+
+
+# Pastel yellow used to flag the truly-neutral boundary layer / Ekman case
+# (Cr = 0) in SBL cooling-rate sweeps, so it reads as distinct from the
+# "crest" gradient used for the stable (Cr > 0) cases rather than sitting at
+# one end of it.
+NBL_COLOR = "#CBCBCB"
+
+
+def cr_palette(cr_values):
+    """Color palette for a set of SBL surface cooling rates Cr (K/hr).
+
+    The neutral case (Cr == 0, TNBL/Ekman) is mapped to NBL_COLOR; the
+    remaining Cr > 0 stable cases are mapped to the "crest" colormap, spread
+    across just those stable values (so adding/removing the neutral case
+    doesn't shift the stable cases' colors).
+
+    Returns a dict {cr: color}, so it's a drop-in replacement for
+    `dict(zip(cr_values, sns.color_palette("crest", n_colors=len(cr_values))))`.
+    """
+    cr_values = sorted(set(cr_values))
+    stable = [cr for cr in cr_values if cr != 0]
+    palette = dict(zip(stable, sns.color_palette("crest", n_colors=len(stable))))
+    if 0 in cr_values:
+        palette[0] = NBL_COLOR
+    return palette
 
 
 def save(stem=None):
