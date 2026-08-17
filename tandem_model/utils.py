@@ -17,11 +17,14 @@ from dataclasses import asdict
 from foreach import foreach
 from scipy.interpolate import interpn
 from scipy.integrate import trapezoid
+from scipy.signal import correlate
 
 import mitwindfarm as mitwf
 import mitwindfarm.tandem  # noqa: F401 - registers TANDEM closures (kl-md, scott, ...)
 from mitwindfarm.utils.integrate import IntegrationException
 from UnifiedMomentumModel import Momentum
+
+from tandem_model import models
 
 # from mitwindfarm import WindfarmSolution, WakeModel, Windfarm, ArbitraryZWindfield, UnifiedAD_veer, Layout
 
@@ -67,6 +70,36 @@ def get_obukhov_length(sim: pio.BudgetIO, crop_budget=True) -> float:
 
     inv_obu = np.mean(inv_obu)
     return np.inf if (inv_obu == 0 or np.isnan(inv_obu)) else 1 / inv_obu
+
+
+def get_ustar(sim: pio.BudgetIO, crop_budget=True) -> float:
+    """
+    Gleans the time-averaged friction velocity u_star from the PadeOps log
+    file's "u_star" diagnostic. Mirrors `get_obukhov_length`'s handling of
+    multiple resubmission logfiles and budget-window cropping.
+    """
+    logfiles = sim.get_logfiles(id=None)
+    for logfile in reversed(logfiles):
+        ret = pio.query_logfile(
+            logfile, search_terms=["u_star", "TIDX", "Time"], crop_equal=False
+        )
+        if len(ret["u_star"]) > 0:
+            break
+    else:
+        raise ValueError(f"No logfile with 'u_star' diagnostics found in {sim.dirname}")
+
+    if crop_budget and sim.input_nml["budget_time_avg"]["do_budgets"]:
+        # re-query with crop_equal so "Time" is cropped to match "u_star" length
+        ret = pio.query_logfile(logfile, search_terms=["u_star", "TIDX", "Time"])
+    ustar = ret["u_star"]
+
+    if crop_budget and sim.input_nml["budget_time_avg"]["do_budgets"]:
+        time_budget_st = sim.input_nml["budget_time_avg"]["time_budget_start"]
+        filt = ret["Time"] > time_budget_st
+        if filt.sum() > 0:
+            ustar = ustar[filt]
+
+    return np.mean(ustar)
 
 
 def wake_fields_LES(
@@ -681,11 +714,20 @@ def get_wakemodel(wakemodel: str, inflow=None, **model_kwargs):
     elif wakemodel == "varvortex":
         _kws = {"windfield": inflow, **model_kwargs}
         wake_model = mitwf.VariableVortexWakeModel(**_kws)
-    elif wakemodel == "gauss":
+    elif (
+        wakemodel == "gauss"
+        or wakemodel in models.WAKEMODEL_OVERRIDES
+        or wakemodel in models.SUPERPOSITION_OVERRIDES
+    ):
         # _kws = {"a": 0.636, "b": 0, "c": 0, **model_kwargs}
         # wake_model = mitwf.VariableKwGaussianWakeModel(**_kws)
+        # "gauss-quad"/"gauss-lin"/"gauss-noti": reasonable variations of the
+        # Gaussian model (see tandem_model.models); superposition-strategy
+        # variants reuse this same wake model class and are switched via
+        # `solve_windfarm_LES`'s `superposition` argument instead.
         _kws = {"windfield": inflow, **model_kwargs}
-        wake_model = mitwf.VariableKwGaussBPWakeModel(**_kws)
+        wake_model_cls = models.WAKEMODEL_OVERRIDES.get(wakemodel, mitwf.VariableKwGaussBPWakeModel)
+        wake_model = wake_model_cls(**_kws)
     else:
         raise ValueError(f"Unknown wakemodel: {wakemodel}")
     return wake_model
@@ -698,10 +740,16 @@ def solve_windfarm_LES(
     return_wakefield=True,
     normalize=True,
     inflow=None,
+    superposition=None,
     **model_kwargs,
 ):
     """
     Return a WindfarmSolution object for a given LES simulation and wake model.
+
+    `superposition` is a `mitwindfarm.Superposition` instance overriding
+    `mitwf.Windfarm`'s default (Niayifar); if None, it's looked up from
+    `models.SUPERPOSITION_OVERRIDES` by `wakemodel` key (falling back to
+    Niayifar if `wakemodel` isn't in that dict either).
     """
     rotor_model = mitwf.UnifiedAD_veer() if rotor_model is None else rotor_model
     inflow = inflow_LES(sim, normalize=normalize) if inflow is None else inflow
@@ -721,10 +769,15 @@ def solve_windfarm_LES(
         except ValueError:
             raise
 
+    if superposition is None:
+        superposition_cls = models.SUPERPOSITION_OVERRIDES.get(wakemodel)
+        superposition = superposition_cls() if superposition_cls else None
+
     wf = mitwf.Windfarm(
         base_windfield=inflow,
         rotor_model=rotor_model,
         wake_model=wake_model,
+        superposition=superposition,
         TIamb=TIamb,  # try to deprecate this parameter !!
     )
     layout, setpoints = layout_LES(sim)
@@ -755,8 +808,35 @@ def solve_windfarm_offline(
     the LES data to populate the cache for a given `family`/`case`, then
     copy `data/<family>/` to run this offline.
     """
-    rotor_model = mitwf.UnifiedAD_veer(rotor_grid=mitwf.Area()) if rotor_model is None else rotor_model
     inflow, layout, setpoints, meta = load_cached_case(family, case, normalize=normalize)
+    return solve_windfarm_setpoints(
+        inflow, layout, setpoints, wakemodel, meta,
+        rotor_model=rotor_model, k_kwargs=k_kwargs, model_kwargs=model_kwargs,
+    )
+
+
+def solve_windfarm_setpoints(
+    inflow,
+    layout,
+    setpoints,
+    wakemodel: str,
+    meta: dict,
+    rotor_model=None,
+    k_kwargs=None,
+    model_kwargs=None,
+):
+    """
+    Core of `solve_windfarm_offline`, factored out to accept `inflow`/
+    `layout`/`setpoints`/`meta` directly rather than loading them via
+    `load_cached_case(family, case)`. Useful when a case's own inflow/meta
+    were never saved (e.g. only per-turbine setpoints and power were
+    recorded) but a *different* case with the same inflow condition has a
+    usable cache to borrow `inflow`/`meta` (`xmax`, `L_obu`, `zwall`, `Ro`)
+    from - `layout`/`setpoints` (a `mitwf.Layout` and a list of
+    (Ctprime, yaw) tuples, e.g. from `layout_sp_from_df`) still come from
+    that new case's own data.
+    """
+    rotor_model = mitwf.UnifiedAD_veer(rotor_grid=mitwf.Area()) if rotor_model is None else rotor_model
 
     if wakemodel in list(mitwf.CurledTurbulenceModel._registry.keys()):
         k_kwargs = k_kwargs or {}
@@ -1257,3 +1337,49 @@ def return_xr(wfsol: WindfarmSolution, x=0, y=0, z=0, field="dk") -> xr.DataArra
             "z": wfsol.windfield.z,
         },
     )
+
+
+def autocorr(arr_1d, **kws):
+    """1D autocorrelation, normalized so the zero-lag value is 1."""
+    ret = correlate(arr_1d, arr_1d, **kws)
+    ret = ret[len(ret) // 2:]  # take positive lags only
+    return ret / ret[0]
+
+
+def autocorr_nd(dataarray, axis):
+    """Computes a spatial autocorrelation of `dataarray` along axis `axis`."""
+    u = dataarray.to_numpy()
+    u_centered = u - np.mean(u, axis=axis, keepdims=True)
+    rho_uu = np.apply_along_axis(autocorr, axis=axis, arr=u_centered)
+    return xr.DataArray(rho_uu, coords=dataarray.coords, dims=dataarray.dims)
+
+
+def compute_Lturb_z(sim: pio.BudgetIO, tidx=None, axis=0, zlim=None):
+    """
+    Computes the integral length scale of the streamwise velocity u, from a
+    single snapshot field, as a function of the vertical coordinate z:
+    L_0 = integral of rho_uu(r) dr out to its first zero crossing, where
+    rho_uu is the (homogeneous-direction-averaged) autocorrelation of u'.
+
+    `axis=0` gives L_0^x (autocorrelating/integrating along x, averaging over
+    y); `axis=1` gives L_0^y (autocorrelating/integrating along y, averaging
+    over x). Ported from `veer_wakes.utils.compute_Lturb_z`.
+    """
+    uprime = sim.slice(field_terms="u", tidx=tidx, zlim=zlim)["u"]
+    ax_opts = [
+        {"mean": "y", "integrate": "x"},  # axis 0
+        {"mean": "x", "integrate": "y"},  # axis 1
+    ]
+    rho_uu = autocorr_nd(uprime, axis=axis)
+    Lz = []
+    if rho_uu.z.shape == ():
+        # singleton in z
+        uu_1d = rho_uu.mean(ax_opts[axis]["mean"])
+        idx = np.where(uu_1d < 0)[0][0]
+        Lz = uu_1d[:idx].integrate(ax_opts[axis]["integrate"]).item()
+    else:
+        for uu_1d in rho_uu.mean(ax_opts[axis]["mean"]).T:
+            idx = np.where(uu_1d < 0)[0][0]
+            Lz.append(uu_1d[:idx].integrate(ax_opts[axis]["integrate"]).item())
+
+    return np.array(Lz)
