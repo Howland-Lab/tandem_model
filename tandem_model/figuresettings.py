@@ -56,9 +56,9 @@ MODEL_DASHES = {
     "scott": (3, 1, 3),
     "tandem": (4, 1),
     "kl-hub": (1, 1),
-    "gauss-quad": (1, 1),
-    "gauss-lin": (5, 1),
-    "gauss-noti": (2, 1, 1, 1),
+    "gauss-quad": (1, 1, 3, 1), #(1, 1),
+    "gauss-lin": (1, 1, 3, 1), #(5, 1),
+    "gauss-noti": (1, 1, 3, 1), #(2, 1, 1, 1),
 }
 
 MODEL_MARKERS = {
@@ -79,7 +79,7 @@ MODEL_MARKERS = {
 # (Cr = 0) in SBL cooling-rate sweeps, so it reads as distinct from the
 # "crest" gradient used for the stable (Cr > 0) cases rather than sitting at
 # one end of it.
-NBL_COLOR = "#CBCBCB"
+NBL_COLOR = "#D9DC84"
 
 
 def cr_palette(cr_values):
