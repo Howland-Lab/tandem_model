@@ -23,18 +23,18 @@ FIGPATH.mkdir(exist_ok=True, parents=True)
 TI_LABELS = {"TI_00": "3\\% TI", "TI_01": "8\\% TI"}
 
 
-def fill_plot(df, ax):
+def fill_plot(df, ax, models=None):
+    models = MODELS if models is None else models
     veer_values = sorted(df["veer_deg"].unique().to_list())
     palette = dict(zip(veer_values, sns.cubehelix_palette(n_colors=len(veer_values), reverse=True)))
 
 
-    # for k, name in enumerate(MODELS):
     sub = df.filter(pl.col("x") >= 1.5)
     for veer_deg, group in sub.group_by("veer_deg", maintain_order=True):
-        for source, ls in [("LES", "-")] + [(name, "--") for name in MODELS]:
+        for source, ls in [("LES", "-")] + [(name, "--") for name in models]:
             # special color for the gaussian model(s)
-            if source in ["gauss", "varvortex"]:  # plot only one; they are identical
-                color = "r" if veer_deg == 0 else "none"
+            if source in ["gauss", "varvortex"]:  # plot only one; they are all identical
+                color = figuresettings.MODEL_COLORS[source] if veer_deg == 0 else "none"
             else:
                 color = palette[veer_deg]
 
@@ -44,8 +44,8 @@ def fill_plot(df, ax):
                 line["du_centerline"],
                 color=color,
                 marker=figuresettings.MODEL_MARKERS[source],
-                markevery=12,
-                ms=3,
+                markevery=20,
+                ms=4,
                 ls=ls,
                 alpha=0.7,
                 zorder=3 if source in ["gauss", "varvortex"] else 0,
@@ -101,8 +101,17 @@ def main_all_TI(regenerate=False):
     axs[1].plot([], [], color="none", label=" ")
     axs[1].plot([], [], color="k", ls="-", label="LES")
     for name in MODELS:
-        axs[1].plot([], [], color="k", ls="--", ms=3, marker=figuresettings.MODEL_MARKERS[name], label=DISPLAY_NAMES[name])
-    # ax.plot([], [], color="k", ls="--", label="Model")
+        color = "k" if name not in ["gauss", "varvortex"] else figuresettings.MODEL_COLORS[name]
+        axs[1].plot(
+            [],
+            [],
+            color=color,
+            ls="--",
+            ms=4,
+            marker=figuresettings.MODEL_MARKERS[name],
+            label=DISPLAY_NAMES[name],
+        )
+
     axs[1].legend(
         title="Veer (deg)",
         fontsize=8,
@@ -115,6 +124,57 @@ def main_all_TI(regenerate=False):
     figuresettings.save()
     plt.close()
 
+
+
+def main_4panel(regenerate=False):
+    """
+    4-panel version of main_all_TI, where the top row shows the analytical models
+    and the bottom row shows the TANDEM model. Columns are the same (3% and 8% TI). 
+    """
+
+    fig, axarr = plt.subplots(2, 2, figsize=(6, 4), sharex=True, sharey=True)
+    for axs, ti_tag in zip(axarr.T, ["TI_00", "TI_01"]):
+        for ax, models in zip(axs, [["gauss", "varvortex"], ["tandem", ]]):
+            df = veer_wakes_centerline(ti_tag=ti_tag, regenerate=regenerate)
+            fill_plot(df, ax, models=models)
+            # title = f"(${chr(97+k)}$) {TI_LABELS[ti_tag]}"
+            # ax.text(0.03, 0.97, title, fontsize=10, ha="left", va="top", transform=ax.transAxes)
+            _models = ", ".join(DISPLAY_NAMES[m] for m in models)
+            title = f"{TI_LABELS[ti_tag]} ({_models})"
+            ax.set_title(title, fontsize=10)
+            ax.set_ylim([-0.55, 0.01])
+
+    for ax in axarr[:, 0]:
+        ax.set_ylabel(r"$\overline{\Delta u}_c/U_h$")
+    for ax in axarr[-1, :]:
+        ax.set_xlabel("$x/D$")
+    for k, ax in enumerate(axarr.flat):
+        ax.text(
+            0.03, 0.97, f"(${chr(97+k)}$)", fontsize=10, ha="left", va="top", transform=ax.transAxes
+        )
+    plt.subplots_adjust(wspace=0.1, right=0.8)
+
+    # add legend elements
+    axs[1].plot([], [], color="none", label=" ")
+    axs[1].plot([], [], color="k", ls="-", label="LES")
+    for name in MODELS:
+        color = "k" if name not in ["gauss", "varvortex"] else figuresettings.MODEL_COLORS[name]
+        m = figuresettings.MODEL_MARKERS[name]
+        lab = DISPLAY_NAMES[name]
+        axs[1].plot([], [], color=color, ls="--", ms=4, marker=m, label=lab,)
+
+    axs[1].legend(
+        title="Veer (deg)",
+        fontsize=8,
+        title_fontsize=8,
+        loc="center left",
+        frameon=False,
+        bbox_to_anchor=(1, 1.1),
+    )
+
+    figuresettings.save()
+    plt.close()
+
+
 if __name__ == "__main__":
-    # main("TI_00", False)
-    main_all_TI(False)
+    main_4panel(False)
