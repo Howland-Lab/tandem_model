@@ -30,7 +30,7 @@ from tandem_model.models import curled_kwargs
 VEER_ROOT = constants.SCRATCH_ROOT / "veer_wakes"
 VEER_IDS = range(1, 6)  # veer_01 .. veer_05
 
-MODELS = ["varvortex", "tandem"]
+MODELS = ["gauss", "varvortex", "tandem"]
 
 
 def veer_dirnames(ti_tag="TI_00", shear_tag="shear_01", ro_f_tag="Ro_f_02"):
@@ -100,4 +100,5 @@ def veer_wakes_centerline(ti_tag="TI_00", models=MODELS, regenerate=False):
 
 
 if __name__ == "__main__":
+    print(veer_wakes_centerline(ti_tag="TI_00", regenerate=True))
     print(veer_wakes_centerline(ti_tag="TI_01", regenerate=True))
