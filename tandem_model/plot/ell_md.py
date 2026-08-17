@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 
 from tandem_model import figuresettings  # noqa: F401
 from tandem_model.constants import FIGPATH, SCRATCH_ROOT
-from tandem_model.generate.mixing_length import ell_md, ell_md_list
+from tandem_model.generate.mixing_length import ell_md
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
-color = figuresettings.NBL_COLOR
+color = "#A9A9A9"
 
 dirname = SCRATCH_ROOT / "nowall" / "veer_00"
 # dirname = SCRATCH_ROOT / "sbl" / f"G_01_z0_02_dTsurf_dt_00"
