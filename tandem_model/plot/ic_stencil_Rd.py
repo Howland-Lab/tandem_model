@@ -17,16 +17,25 @@ wake profile), (b) "Corrected R_d/D", (c) "Ali correction", swept over
 Ctprime for a range of IC smoothing widths sigma_IC. The schematic reproduces
 the final figure of analysis_code/kl_model/notebooks_s3/2026_nawea.ipynb
 ("Initial condition figure" section).
+
+Uses `UnifiedMomentumExtended` (see `_umm_smooth_pressure.py`, this directory)
+in place of `UnifiedMomentumModel.Momentum.UnifiedMomentum` throughout. The
+base class's p_NL lookup table is truncated at x0=10D and clamps to 0 beyond
+that, which produces a real jump in dp (and therefore in R_d) right where the
+Newton solve's x0 crosses that edge -- visible as a kink in panel (b)/(c) for
+small Ctprime. UnifiedMomentumExtended retabulates p_NL further out and
+smoothly decays it to zero past the table edge instead of clamping, without
+touching UnifiedMomentumModel itself.
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import seaborn as sns
-from UnifiedMomentumModel import Momentum
 
 from mitwindfarm.CurledWake import ali_lambda, ic_stencil
 from tandem_model import figuresettings
+from tandem_model.plot._umm_smooth_pressure import UnifiedMomentumExtended
 
 SIGMA_0 = 0.21  # far-wake diffusion length scale
 SIGMA_ICS = [0.01, 0.05, 0.1, 0.15, 0.2]
@@ -40,7 +49,7 @@ def ic_stencil_corrected_diag(y, z, yt, zt, Ctprime, yaw=0, sigma_ic=0.1, sigma_
     """Same Newton iteration as mitwindfarm.CurledWake.ic_stencil_corrected, but
     returns (R_d, n_iter, ali_factor) instead of the du field, for plotting."""
     guess_r = 0.5
-    unified = Momentum.UnifiedMomentum()
+    unified = UnifiedMomentumExtended()
     sol = unified(Ctprime, yaw)
     du_mag = 1 - sol.u4
     thrust_x = -sol.Ct * np.pi / 8 * np.cos(yaw)
@@ -77,7 +86,7 @@ def plot_ic_schematic(ax, Ctprime=2.0, sigma_diff=SIGMA_0, smooth_fact=0.1):
     sigma_IC, and delta_u_0 annotated."""
     yt, zt = 0.0, 0.0
 
-    unified = Momentum.UnifiedMomentum()
+    unified = UnifiedMomentumExtended()
     sol = unified(Ctprime, 0.0)
     Rd, _, _, _ = ic_stencil_corrected_diag(
         Y, Z, yt, zt, Ctprime, yaw=0.0, sigma_ic=smooth_fact, sigma_diff=sigma_diff
@@ -127,7 +136,7 @@ def plot_ic_schematic(ax, Ctprime=2.0, sigma_diff=SIGMA_0, smooth_fact=0.1):
 
 
 def main():
-    unified = Momentum.UnifiedMomentum()
+    unified = UnifiedMomentumExtended()
     ret = []
     for sigma_ic in SIGMA_ICS:
         res = [
