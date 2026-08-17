@@ -104,7 +104,7 @@ def parse_cooling_rate(case):
     """
     match = re.search(r"dTsurf_dt_(\d+)", case)
     if match is None:
-        return None
+        return 0.0
     return round(int(match.group(1)) * 0.1, 2)
 
 
