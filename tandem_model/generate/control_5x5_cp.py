@@ -133,10 +133,24 @@ def cp_5x5(cases=CASES, models=MODELS, regenerate=False):
         df = cp(parent / case, models=models, regenerate=regenerate)
         df_list.append(df.with_columns(pl.lit(case).alias("case")))
 
-    return pl.concat(df_list, how="diagonal_relaxed").with_columns(
+    df = pl.concat(df_list, how="diagonal_relaxed").with_columns(
         pl.col("turbine").replace(ROW_MAPPING, default=None).alias("Row"),
     )
 
+    return add_Pnorm(df)
+
+def add_Pnorm(df):
+    """Adds Pnorm column"""
+    Cp_ref = (
+        df.filter(case="nocontrol", Row=1)
+        .group_by("model")
+        .agg(pl.mean("Cp").alias("Cp_ref"))
+    )
+    df = (
+        df.join(Cp_ref, on="model")
+        .with_columns((pl.col("Cp") / pl.col("Cp_ref")).alias("Pnorm"))
+    )
+    return df
 
 if __name__ == "__main__":
     print(cp_5x5(regenerate=True))

@@ -1,6 +1,6 @@
 """
 Scatter Model Cp vs. LES Cp for the CNBL 5x5 wind-farm control comparison
-(greedy vs. yaw control), one subplot per control case.
+(greedy vs. yaw control), one subplot per wake model.
 
 Reproduces the "Compare models for a given case" scatter figure of
 `kl_model/notebooks_s3/00_wakemodel_testing.ipynb`.
@@ -15,41 +15,54 @@ import matplotlib.pyplot as plt
 from UnifiedMomentumModel import Momentum
 
 from tandem_model import figuresettings
-from tandem_model.figuresettings import MODEL_COLORS, MODEL_MARKERS
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
 from tandem_model.generate.control_5x5_cp import cp_5x5, MODELS, CASES
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
 
-LABELS = {"nocontrol": "Greedy control", "yawcontrol": "Wake steering"}
+LABELS = {"nocontrol": "Greedy", "yawcontrol": "Steering"}
+CTRL_COLORS = {"nocontrol": "k", "yawcontrol": "deepskyblue"}
+# Markers now distinguish control strategy (color is reserved for the model,
+# per MODEL_COLORS) rather than the model itself.
+CASE_MARKERS = {"nocontrol": "o", "yawcontrol": "^"}
+# Leading-row turbines (Row == 1) see undisturbed inflow, so they're not a
+# useful test of wake-model skill: greyed out here and dropped from the MAE.
+LEADING_ALPHA = 0.1
+WAKED_ALPHA = 0.7
 Pnorm_model = Momentum.UnifiedMomentum()(2.0, 0).Cp
 
 def main(regenerate=False):
     df = cp_5x5(regenerate=regenerate)
-    les = df.filter(pl.col("model") == "LES")
-    Pnorm_les = les.filter(case="nocontrol", Row=1)["Cp"].mean()
-    les = les.with_columns(  # add pnorm column
-        (pl.col("Cp") / Pnorm_les).alias("Pnorm")
-    ).select("case", "turbine", pl.col("Pnorm").alias("Pnorm_les"))
 
-    fig, axs = plt.subplots(ncols=len(CASES), figsize=(4, 4), sharex=True, sharey=True)
-    for k, (ax, case) in enumerate(zip(axs, CASES)):
-        for name in MODELS:
+    fig, axs = plt.subplots(ncols=len(MODELS), figsize=(8, 2.2), sharex=True, sharey=True)
+    for k, (ax, name) in enumerate(zip(axs, MODELS)):
+        for case in CASES:
             sub = (
-                df.filter(pl.col("case") == case, pl.col("model") == name)
-                .join(les.filter(pl.col("case") == case), on=["case", "turbine"])
-                .with_columns((pl.col("Cp") / Pnorm_model).alias("Pnorm"))
-            )
-            mae = np.abs(sub["Pnorm"] - sub["Pnorm_les"]).mean()
-            ax.scatter(
-                sub["Pnorm_les"],
-                sub["Pnorm"],
-                color=MODEL_COLORS[name],
-                marker=MODEL_MARKERS[name],
+                df.filter(pl.col("case") == case, pl.col("model").is_in([name, "LES"]))
+            ).sort("turbine_id")
+            leading = sub.filter(pl.col("Row") == 1)
+            waked = sub.filter(pl.col("Row") != 1)
+            mae = np.abs(waked.filter(model=name)["Pnorm"] - waked.filter(model="LES")["Pnorm"]).mean()
+            print(mae)
+
+            ax.scatter(  # leading-row turbines: greyed out, excluded from MAE
+                leading.filter(model="LES")["Pnorm"],
+                leading.filter(model=name)["Pnorm"],
+                color=CTRL_COLORS[case],
+                marker=CASE_MARKERS[case],
                 s=8,
-                alpha=0.6,
-                label=f"{DISPLAY_NAMES.get(name, name)} (MAE = {mae:.3f})",
+                alpha=LEADING_ALPHA,
+            )
+            ax.scatter(
+                waked.filter(model="LES")["Pnorm"],
+                waked.filter(model=name)["Pnorm"],
+                color=CTRL_COLORS[case],
+                marker=CASE_MARKERS[case],
+                s=8,
+                alpha=WAKED_ALPHA,
+                # label=f"{LABELS.get(case, case)} (MAE = {mae:.3f})",
+                label=LABELS.get(case, case),
             )
         lims = np.array([0.47, 1.05])
         ticks = [0.5, 0.75, 1.0]
@@ -62,11 +75,11 @@ def main(regenerate=False):
         ax.grid(True, which="both", ls=":", lw=0.5, alpha=0.5)
         ax.set_aspect(1)
         ax.set_xlabel(r"LES $P/P_\mathrm{Betz}$")
-        ax.set_title(LABELS.get(case, case), fontsize=10,)
-        ax.text(0, 1.03, f"(${chr(k+97)}$)", fontsize=10, va="bottom", ha="center", transform=ax.transAxes)
-        ax.legend(fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.3))
+        ax.set_title(f"(${chr(k+97)}$) {DISPLAY_NAMES.get(name, name)}", fontsize=10, loc="left")
+        # ax.legend(fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.3))
 
     axs[0].set_ylabel(r"Model $P/P_\mathrm{Betz}$")
+    axs[-1].legend(loc="lower right", fontsize=8,)
     plt.subplots_adjust(wspace=0.2, bottom=0.2)
 
     figuresettings.save()

@@ -23,7 +23,7 @@ from tandem_model import figuresettings
 from tandem_model.figuresettings import MODEL_COLORS
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
-from tandem_model.generate.control_5x5_cp import cp_5x5, MODELS, CASES
+from tandem_model.generate.control_5x5_cp import cp_5x5, add_Pnorm, MODELS, CASES
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
 
@@ -31,7 +31,6 @@ ORDER = ["LES", *MODELS]  # legend/bar order: LES first, then generate.MODELS or
 MODEL_LABELS = {m: DISPLAY_NAMES.get(m, m) for m in ORDER}
 PALETTE = {MODEL_LABELS[m]: MODEL_COLORS[m] for m in ORDER}
 CASE_LABELS = {"nocontrol": "Greedy control", "yawcontrol": "Wake steering"}
-Pnorm_model = Momentum.UnifiedMomentum()(2.0, 0).Cp
 
 
 def _normalized_power(df):
@@ -41,17 +40,9 @@ def _normalized_power(df):
     normalization as the crude computation sketched in
     notebooks/00_5x5_farm.ipynb.
     """
-    les_cp = df.filter(model="LES", case="nocontrol", Row=1)["Cp"].mean()
-    df = df.with_columns(
-        pl.when(pl.col("model") == "LES")
-        .then(pl.lit(les_cp))
-        .otherwise(Pnorm_model)
-        .alias("Cp_norm")
-    ).with_columns((pl.col("Cp") / pl.col("Cp_norm")).alias("P_norm"))
-
     return (
-        df.group_by("model", "case", maintain_order=True)
-        .agg(pl.mean("P_norm").alias("P_norm_mean"))
+        add_Pnorm(df).group_by("model", "case", maintain_order=True)
+        .agg(pl.mean("Pnorm").alias("P_norm_mean"))
         .with_columns(pl.col("model").replace(MODEL_LABELS).alias("Model"))
     )
 
@@ -92,7 +83,7 @@ def main(regenerate=False):
     ax_power.set_xticks(range(len(CASES)))
     ax_power.set_xticklabels([CASE_LABELS.get(c, c) for c in CASES])
     ax_power.set_xlabel("")
-    ax_power.set_ylabel(r"$\Sigma P / (N_t P_\mathrm{Betz})$")
+    ax_power.set_ylabel(r"$\Sigma P / (N P_\mathrm{Betz})$")
     ax_power.text(
         0,
         1.03,
