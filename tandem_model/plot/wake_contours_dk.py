@@ -66,7 +66,7 @@ def main(regenerate=False, crs=CRS):
                 z = np.sort(sub["z"].unique().to_numpy())
                 dk = sub["dk"].to_numpy().reshape(len(y), len(z))
                 im = ax.contourf(
-                    y, z, dk.T, cmap="inferno", levels=LEVELS, extend="both"
+                    y, z, dk.T, cmap="inferno", levels=LEVELS, extend="both", rasterized=True
                 )
                 # im = ax.pcolormesh(y, z, dk.T, cmap="inferno", vmin=LEVELS[0], vmax=LEVELS[-1])
 

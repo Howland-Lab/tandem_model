@@ -29,7 +29,7 @@ YLABELS = {
 }
 
 
-def main(key="du_avg_rmse", regenerate=False, regenerate_sbl=False):
+def plot(key="du_avg_rmse", regenerate=False, regenerate_sbl=False):
     df = du_rmse(regenerate=regenerate, regenerate_sbl=regenerate_sbl).with_columns(
         pl.format("{}", pl.col("Cr")).alias("Cr_label")
     )
@@ -71,8 +71,11 @@ def main(key="du_avg_rmse", regenerate=False, regenerate_sbl=False):
     print(df.group_by("model").agg(pl.mean(key)).sort(key))
 
 
+def main(regenerate=False):
+    plot(key="du_centerline_rmse", regenerate=regenerate)
+    plot(key="du_min_rmse", regenerate=regenerate)
+    plot(key="du_avg_rmse", regenerate=regenerate)
+    plot(key="dk_max_rmse", regenerate=regenerate)
+
 if __name__ == "__main__":
-    main(key="du_centerline_rmse", regenerate=True)
-    main(key="du_min_rmse", regenerate=False)
-    main(key="du_avg_rmse", regenerate=False)
-    main(key="dk_max_rmse", regenerate=False)
+    main(False)

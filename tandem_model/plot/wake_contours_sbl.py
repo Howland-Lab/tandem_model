@@ -30,7 +30,7 @@ FIGPATH.mkdir(exist_ok=True, parents=True)
 LEVELS = np.arange(-0.4125, 0.01, 0.025)
 
 
-def main(regenerate=False, cr=0.5):
+def main_yz(regenerate=False, cr=0.5):
     df = wake_contours_sbl(regenerate=regenerate)
 
     ROWS = ["LES"] + MODELS
@@ -50,7 +50,7 @@ def main(regenerate=False, cr=0.5):
             y = np.sort(sub["y"].unique().to_numpy())
             z = np.sort(sub["z"].unique().to_numpy())
             du = sub["du"].to_numpy().reshape(len(y), len(z))
-            im = ax.contourf(y, z, du.T, cmap="mako", levels=LEVELS, extend="both")
+            im = ax.contourf(y, z, du.T, cmap="mako", levels=LEVELS, extend="both", rasterized=True)
 
             ax.set_ylim([-15 / 24, 2])
             ax.set_xlim([-3.3, 3.3])
@@ -106,7 +106,7 @@ def main_xy(regenerate=False, cr_values=(0.1, 0.3, 0.5)):
             yg = np.sort(sub["y"].unique().to_numpy())
             du = sub["du"].to_numpy().reshape(len(xg), len(yg))
             ax.pcolormesh(
-                xg, yg, du.T, cmap="mako", vmin=LEVELS.min(), vmax=LEVELS.max()
+                xg, yg, du.T, cmap="mako", vmin=LEVELS.min(), vmax=LEVELS.max(), rasterized=True
             )
 
             ax.set_xlim(XLIM_XY)
@@ -126,7 +126,10 @@ def main_xy(regenerate=False, cr_values=(0.1, 0.3, 0.5)):
     plt.close()
 
 
+def main(regenerate=False):
+    main_yz(regenerate=regenerate, cr=0.1)
+    main_yz(regenerate=regenerate, cr=0.5)
+
+
 if __name__ == "__main__":
-    main(False, 0.1)
-    main(False, 0.5)
-    # main_xy(False)
+    main(False)

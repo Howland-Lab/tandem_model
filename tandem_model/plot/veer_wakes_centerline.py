@@ -53,7 +53,7 @@ def fill_plot(df, ax, models=None):
             )
 
 
-def main(ti_tag, regenerate=False):
+def main_ti(ti_tag, regenerate=False):
     df = veer_wakes_centerline(ti_tag=ti_tag, regenerate=regenerate)
     fig, ax = plt.subplots(figsize=(3.5, 2.5), sharex=True, sharey=True)
     fill_plot(df, ax)
@@ -176,5 +176,9 @@ def main_4panel(regenerate=False):
     plt.close()
 
 
+def main(regenerate=False):
+    main_4panel(regenerate=regenerate)
+
+
 if __name__ == "__main__":
-    main_4panel(False)
+    main(False)

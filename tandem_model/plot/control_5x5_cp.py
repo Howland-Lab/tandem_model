@@ -44,7 +44,6 @@ def main(regenerate=False):
             leading = sub.filter(pl.col("Row") == 1)
             waked = sub.filter(pl.col("Row") != 1)
             mae = np.abs(waked.filter(model=name)["Pnorm"] - waked.filter(model="LES")["Pnorm"]).mean()
-            print(mae)
 
             ax.scatter(  # leading-row turbines: greyed out, excluded from MAE
                 leading.filter(model="LES")["Pnorm"],
