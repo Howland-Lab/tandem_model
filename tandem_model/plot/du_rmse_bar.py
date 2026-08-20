@@ -73,6 +73,6 @@ def main(key="du_avg_rmse", regenerate=False, regenerate_sbl=False):
 
 if __name__ == "__main__":
     main(key="du_centerline_rmse", regenerate=True)
-    main(key="du_min_rmse", regenerate=True)
-    main(key="du_avg_rmse", regenerate=True)
-    main(key="dk_max_rmse", regenerate=True)
+    main(key="du_min_rmse", regenerate=False)
+    main(key="du_avg_rmse", regenerate=False)
+    main(key="dk_max_rmse", regenerate=False)

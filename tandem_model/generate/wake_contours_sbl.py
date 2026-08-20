@@ -21,10 +21,7 @@ from tandem_model import caching as cache, constants
 from tandem_model.benchmarking import Benchmark
 from tandem_model.generate.mixing_length import parse_cooling_rate
 from tandem_model.models import curled_kwargs
-
-SBL_DIRNAMES = [
-    constants.SCRATCH_ROOT / "sbl" / f"G_01_z0_02_dTsurf_dt_{i:02d}" for i in range(1, 6)
-]
+from tandem_model.generate.streamtube_sbl import SBL_DIRNAMES, ABL_DIRNAMES
 
 XVALS = [5, 10, 15]
 
@@ -101,7 +98,7 @@ def compute_wake_contours_sbl(
     return pl.concat(df_ls)
 
 
-def wake_contours_sbl(dirnames=SBL_DIRNAMES, xs=XVALS, models=MODELS, regenerate=False):
+def wake_contours_sbl(dirnames=ABL_DIRNAMES, xs=XVALS, models=MODELS, regenerate=False):
     """
     Computes (or loads from cache) du cross-sections vs. x for SBL cases.
     Cached at data/sbl/wake_contours.csv.

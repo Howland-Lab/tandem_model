@@ -21,13 +21,13 @@ FIGPATH.mkdir(exist_ok=True, parents=True)
 
 # subset of generate.streamtube_sbl.MODELS (which now also includes the
 # models only needed for the RMSE bar chart) to draw as line-plot panels here
-PLOT_MODELS = ["varvortex", "tandem"]
+PLOT_MODELS = ["gauss", "tandem"]
 
 
 def main(regenerate=False):
     df = streamtube_sbl(regenerate=regenerate)
     cr_values = sorted(df["Cr"].unique().to_list())
-    palette = dict(zip(cr_values, sns.color_palette("crest", n_colors=len(cr_values))))
+    palette = figuresettings.cr_palette(cr_values)  # dict(zip(cr_values, sns.color_palette("crest", n_colors=len(cr_values))))
 
     fig, axs = plt.subplots(ncols=len(PLOT_MODELS), figsize=(6, 2), sharex=True, sharey=True)
     for k, (name, ax) in enumerate(zip(PLOT_MODELS, axs)):
@@ -42,6 +42,7 @@ def main(regenerate=False):
                     color=color,
                     ls=ls,
                     label=f"${cr:.1f}$" if source == "LES" else None,
+                    zorder=1 if source != "LES" else 0,
                 )
 
         ax.set_ylim([-0.54, 0.02])

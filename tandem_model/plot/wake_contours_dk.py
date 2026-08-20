@@ -68,6 +68,7 @@ def main(regenerate=False, crs=CRS):
                 im = ax.contourf(
                     y, z, dk.T, cmap="inferno", levels=LEVELS, extend="both"
                 )
+                # im = ax.pcolormesh(y, z, dk.T, cmap="inferno", vmin=LEVELS[0], vmax=LEVELS[-1])
 
                 ax.set_ylim([-15 / 24, 2])
                 ax.set_xlim([-3.3, 3.3])
