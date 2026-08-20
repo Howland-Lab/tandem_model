@@ -12,6 +12,12 @@ label. Gaussian-model dk is not shown (no meaningful wake-added-TKE
 prediction), even though `generate.superposition_dk` computes it for
 consistency.
 
+The top (power) row additionally plots three "reasonable variation" probes
+on the Gaussian model (`GAUSS_VARIANTS`, see `tandem_model.models`):
+swapping its Niayifar superposition for Quadratic or Linear, and disabling
+its wake-added-TI contribution to kw. These are power-only (not computed for
+du/dk) and don't change mitwindfarm itself.
+
 Kirby Heck
 2026
 """
@@ -24,13 +30,20 @@ from tandem_model import figuresettings  # noqa: F401
 from tandem_model.figuresettings import MODEL_COLORS, MODEL_MARKERS, MODEL_DASHES
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
-from tandem_model.generate.superposition_power import power_10x1
+from tandem_model.generate.superposition_power import power_10x1, MODELS as POWER_MODELS
 from tandem_model.generate.superposition_dk import dk_10x1
 from tandem_model.generate.superposition_du import du_centerline_10x1
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
 
-MODELS_PLOT = ("LES", "gauss", "kl-hub", "tandem")
+# "gauss-quad"/"gauss-lin"/"gauss-noti": reasonable variations of the
+# Gaussian model (superposition strategy / wake-added-TI, see
+# tandem_model.models), plotted alongside "gauss" in the power subplot only.
+# GAUSS_VARIANTS = ("gauss-quad", "gauss-lin", "gauss-noti")
+GAUSS_VARIANTS = ("gauss-lin", "gauss-noti")
+POWER_MODELS = POWER_MODELS + GAUSS_VARIANTS
+
+MODELS_PLOT = ("LES", "kl-hub", "tandem", "gauss", *GAUSS_VARIANTS)
 MODELS_PLOT2 = ("LES", "kl-hub", "tandem")
 DK_MODELS = ("gauss", "kl-hub", "tandem")  # computed for consistency; gauss excluded below
 DK_EXCLUDE = "gauss"
@@ -38,7 +51,7 @@ MARGIN = 2.0  # extra space (x/D) before/after the turbine array on the shared x
 
 
 def main(regenerate=False):
-    power = power_10x1(regenerate=regenerate)
+    power = power_10x1(models=POWER_MODELS, regenerate=regenerate)
     du = du_centerline_10x1(regenerate=regenerate).rename({"source": "model"})
     dk = dk_10x1(models=DK_MODELS, regenerate=regenerate)
 
@@ -134,7 +147,10 @@ def main(regenerate=False):
 
     handles, labels = axs[0].get_legend_handles_labels()
     labels = [DISPLAY_NAMES.get(label, label) for label in labels]
-    axs[0].legend(handles, labels, loc="upper right", bbox_to_anchor=(1, 1), ncols=2, fontsize=8, frameon=False)
+    axs[0].legend(
+        handles, labels, loc="upper right", bbox_to_anchor=(1, 1), ncols=2,
+        fontsize=6.5, frameon=False, columnspacing=0.8, handlelength=1.4,
+    )
 
     handles, labels = axs[1].get_legend_handles_labels()
     labels = [DISPLAY_NAMES.get(label, label) for label in labels]
@@ -145,4 +161,4 @@ def main(regenerate=False):
 
 
 if __name__ == "__main__":
-    main(True)
+    main(False)

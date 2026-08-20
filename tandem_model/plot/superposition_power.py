@@ -28,7 +28,7 @@ LABELS = {
     "CNBL_4x1_wd050": r"$5^\circ$",
     "CNBL_4x1_wd100": r"$10^\circ$",
 }
-MODELS_PLOT = ("LES",) + ("gauss", "scott", "kl-hub", "tandem")  # only plot these models, in this order
+MODELS_PLOT = ("LES",) + ("gauss", "2021", "scott", "kl-hub", "tandem")  # only plot these models, in this order
 
 
 def main(regenerate=False):
@@ -74,7 +74,7 @@ def main(regenerate=False):
         labels,
         loc="center left",
         bbox_to_anchor=(0.9, 0.5),
-        fontsize=8,
+        fontsize=10,
     )
     plt.subplots_adjust(hspace=0.3, wspace=0.1)
 
