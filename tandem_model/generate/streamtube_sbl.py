@@ -155,4 +155,4 @@ def thrust_wakes(dirnames=CTP_DIRNAMES, models=MODELS, regenerate=False):
 
 if __name__ == "__main__":
     print(streamtube_sbl(regenerate=True))
-    print(thrust_wakes(regenerate=True))
+    # print(thrust_wakes(regenerate=True))

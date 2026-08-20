@@ -32,6 +32,12 @@ def x0_veer_les():
     Loads near-wake length x0 vs. veer LES data. Columns: TI (%), veer (deg,
     inflow/precursor value), veer_0 (deg, local value at the turbine), x0
     (near-wake length, x0/D), power (fitted far-wake power-law exponent).
+
+    Note: this file is not generated in this repository. Data are included from 
+    the veer_wakes repo (postprocessed output) and cached here. The source data
+    for these results are published in: 
+    Heck, K. and Howland, M. "Unravelling the effects of atmospheric dynamics on 
+    wakes with a controlled synthetic inflow methodology" Flow, 6 2026,E24.
     """
     return pl.read_csv(DATA_PATH / "veer_wakes" / "x0_veer.csv")
 

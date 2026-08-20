@@ -30,20 +30,14 @@ from tandem_model import figuresettings  # noqa: F401
 from tandem_model.figuresettings import MODEL_COLORS, MODEL_MARKERS, MODEL_DASHES
 from tandem_model.constants import FIGPATH
 from tandem_model.models import DISPLAY_NAMES
-from tandem_model.generate.superposition_power import power_10x1, MODELS as POWER_MODELS
+from tandem_model.generate.superposition_power import power_10x1, MODELS10
 from tandem_model.generate.superposition_dk import dk_10x1
 from tandem_model.generate.superposition_du import du_centerline_10x1
 
 FIGPATH.mkdir(exist_ok=True, parents=True)
 
-# "gauss-quad"/"gauss-lin"/"gauss-noti": reasonable variations of the
-# Gaussian model (superposition strategy / wake-added-TI, see
-# tandem_model.models), plotted alongside "gauss" in the power subplot only.
-# GAUSS_VARIANTS = ("gauss-quad", "gauss-lin", "gauss-noti")
-GAUSS_VARIANTS = ("gauss-lin", "gauss-noti")
-POWER_MODELS = POWER_MODELS + GAUSS_VARIANTS
 
-MODELS_PLOT = ("LES", "kl-hub", "tandem", "gauss", *GAUSS_VARIANTS)
+MODELS_PLOT = ("LES", "kl-hub", "tandem", "gauss", "gauss-lin", "gauss-noti")
 MODELS_PLOT2 = ("LES", "kl-hub", "tandem")
 DK_MODELS = ("gauss", "kl-hub", "tandem")  # computed for consistency; gauss excluded below
 DK_EXCLUDE = "gauss"
@@ -51,7 +45,7 @@ MARGIN = 2.0  # extra space (x/D) before/after the turbine array on the shared x
 
 
 def main(regenerate=False):
-    power = power_10x1(models=POWER_MODELS, regenerate=regenerate)
+    power = power_10x1(models=MODELS10, regenerate=regenerate)
     du = du_centerline_10x1(regenerate=regenerate).rename({"source": "model"})
     dk = dk_10x1(models=DK_MODELS, regenerate=regenerate)
 

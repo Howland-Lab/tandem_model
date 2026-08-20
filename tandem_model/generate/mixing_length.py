@@ -23,15 +23,22 @@ import padeopsIO as pio
 import polars as pl
 
 from mitwindfarm.tandem import phi_m
-
 from tandem_model import caching as cache, constants, utils
+
+
+UNIFORM_DIR = constants.SCRATCH_ROOT / "nowall" / "veer_00"
+DIRNAMES_SBL = [
+    UNIFORM_DIR,
+    constants.SCRATCH_ROOT / "sbl" / "G_01_z0_01_dTsurf_dt_03",
+    constants.SCRATCH_ROOT / "sbl" / "G_01_z0_01_dTsurf_dt_05",
+]
 
 TERMS = ["ubar", "uu", "uv", "uw", "vv", "ww"]
 
 
 def compute_ell_md(
     dirname,
-    xlim=(0, 15),
+    xlim=(0.05, 15),
     ylim=(-5, 5),
     zlim=(-1, 1.5),
     runid=None,
@@ -124,4 +131,5 @@ def ell_md_list(dirnames, regenerate=False, **kwargs):
 
 
 if __name__ == "__main__":
-    pass
+    print(ell_md(UNIFORM_DIR, regenerate=True, zlim=[-1, 1], xlim=[0.05, 15]))
+    print(ell_md_list(DIRNAMES_SBL, regenerate=True, zlim=[-1, 1], xlim=[0, 15]))

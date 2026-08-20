@@ -25,6 +25,11 @@ from tandem_model import caching as cache, constants, utils
 from tandem_model.models import curled_kwargs
 
 MODELS = ("gauss", "2021", "scott", "kl-hub", "tandem")
+# "gauss-quad"/"gauss-lin"/"gauss-noti": reasonable variations of the
+# Gaussian model (superposition strategy / wake-added-TI, see
+# tandem_model.models), plotted alongside "gauss" in the power subplot only.
+GAUSS_VARIANTS = ("gauss-lin", "gauss-noti")
+MODELS10 = MODELS + GAUSS_VARIANTS
 
 # CNBL_4x1_wd{:03d}: 4-row wind farms at 0, 2.5, 5, 10 degrees wind direction
 # (directory suffix = wind direction in degrees x10).
@@ -97,7 +102,7 @@ def power_4x1(cases=CASES, models=MODELS, regenerate=False):
     return pl.concat(df_list, how="diagonal_relaxed")
 
 
-def power_10x1(case=CASE10, models=MODELS, regenerate=False):
+def power_10x1(case=CASE10, models=MODELS10, regenerate=False):
     """
     Computes/loads normalized power vs. x for each CNBL 10x1 wind-direction
     case in `constants.SCRATCH_ROOT / "superposition"`, concatenated into one

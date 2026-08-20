@@ -11,27 +11,18 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from tandem_model import figuresettings, models, constants
-from tandem_model.constants import FIGPATH, SCRATCH_ROOT
-from tandem_model.generate.mixing_length import ell_md, ell_md_list
+from tandem_model.generate.mixing_length import ell_md_list, DIRNAMES_SBL
 
-FIGPATH.mkdir(exist_ok=True, parents=True)
 C_NU = models.K_KWARGS["tandem"]["C_nu"]
 C_w = models.K_KWARGS["tandem"]["C_w"]
 
 cr_ids = [0, 3, 5]
-# dirnames = [SCRATCH_ROOT / "sbl" / f"G_01_z0_02_dTsurf_dt_{i:02d}" for i in cr_ids]
-dirnames = [
-    # SCRATCH_ROOT / "sbl" / "G_01_z0_02_dTsurf_dt_00",
-    SCRATCH_ROOT / "nowall" / "veer_00",
-    SCRATCH_ROOT / "sbl" / "G_01_z0_01_dTsurf_dt_03",
-    SCRATCH_ROOT / "sbl" / "G_01_z0_01_dTsurf_dt_05",
-]
 
 
 def main(regenerate=False):
     fig, ax = plt.subplots(figsize=(3.25, 2.5))
     df = ell_md_list(
-        dirnames, regenerate=regenerate, zlim=[-1, 1], xlim=[0, 15]
+        DIRNAMES_SBL, regenerate=regenerate,
     ).with_columns(
         (pl.col("l") / C_NU).alias("l_scaled"),
     )
