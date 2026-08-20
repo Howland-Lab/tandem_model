@@ -63,6 +63,35 @@ K_KWARGS = {
 }
 
 
+# solver keys backed by mitwindfarm's vortex-sheet wake model
+# (VortexWakeModel/VariableVortexWakeModel), which take an optional
+# (non-dimensional) `ustar` friction-velocity input for vortex-decay/ground-
+# effect modeling near a wall.
+VORTEX_MODEL_KEYS = {"vortex", "varvortex"}
+
+# BudgetIO runids for the wall-bounded ABL simulations (paired
+# precursor=4/main=5); only these have a friction velocity to report.
+# Synthetic-inflow simulations (e.g. the wind veer sweep, runid 1/2) have no
+# wall and therefore no u_star.
+ABL_RUNIDS = {4, 5}
+
+
+def ustar_kwarg(wakemodel: str, meta: dict) -> dict:
+    """
+    Returns {"ustar": meta["ustar"]} for the vortex-sheet wake models (see
+    VORTEX_MODEL_KEYS) - a non-dimensional u_star/U_hub cached in LES case
+    metadata (see `utils.case_meta_LES`/`utils.get_ustar_nondim`), already
+    None for synthetic-inflow simulations (no wall, see ABL_RUNIDS), and
+    also None (via meta.get) for cases whose cached meta predates the
+    "ustar" column - or {} for any other `wakemodel`, leaving that model's
+    default (unmodeled vortex decay) untouched. Merge into
+    `utils.get_wakemodel`'s model_kwargs.
+    """
+    if wakemodel not in VORTEX_MODEL_KEYS:
+        return {}
+    return dict(ustar=meta.get("ustar"))
+
+
 # solver key -> mitwindfarm.Superposition class override for
 # `utils.solve_windfarm_LES` (absent -> mitwindfarm.Windfarm's own default,
 # Niayifar). Only the two Gaussian-variant keys below change superposition

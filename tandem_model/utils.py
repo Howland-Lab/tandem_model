@@ -184,6 +184,22 @@ def _inflow_source_and_xlim(sim: pio.BudgetIO, xlim=None):
     return sim, [xst, xst + 1]  # assume this is in turbine-normalized coordinates
 
 
+def get_ustar_nondim(sim: pio.BudgetIO):
+    """
+    Non-dimensional friction velocity u_star/U_hub (sim.get_ustar() /
+    sim.get_uhub()) for wall-bounded ABL simulations (see
+    models.ABL_RUNIDS), read from the precursor run (see
+    `_inflow_source_and_xlim`, same run `inflow_LES` sources its undisturbed
+    inflow profile from). Returns None for synthetic-inflow simulations
+    (e.g. the wind veer sweep, runid 1/2), which have no wall and therefore
+    no u_star.
+    """
+    if sim.runid not in models.ABL_RUNIDS:
+        return None
+    precursor, _ = _inflow_source_and_xlim(sim)
+    return precursor.get_ustar() / precursor.get_uhub()
+
+
 def _read_inflow_profile_LES(sim: pio.BudgetIO, xlim=None, ylim=None, zlim=None):
     """
     Reads and y-averages the inflow profile (ubar, vbar, wbar, Tbar, tke, U
@@ -336,9 +352,13 @@ def case_meta_LES(sim: pio.BudgetIO, regenerate=False) -> dict:
     marching, `L_obu`: Obukhov length used by the tandem/tandem-md
     turbulence closures, `zwall`: wall height for the curled wake solver,
     `Ro`: turbine-diameter-based Rossby number used by the "2021" (Curl)
-    turbulence closure) needed to set up a curled-wake solve, cached at
-    data/<family>/<case>_meta.csv so it can be reconstructed without a
-    BudgetIO object.
+    turbulence closure, `ustar`: non-dimensional friction velocity
+    u_star/U_hub - see `get_ustar_nondim` - used by the vortex-sheet wake
+    models, None for synthetic-inflow cases) needed to set up a curled-wake
+    or vortex-sheet solve, cached at data/<family>/<case>_meta.csv so it can
+    be reconstructed without a BudgetIO object. Cases cached before `ustar`
+    was added here won't have that column - `models.ustar_kwarg` falls back
+    to None for those; pass `regenerate=True` to pick up a real value.
     """
     from tandem_model import caching as cache, constants
 
@@ -352,7 +372,8 @@ def case_meta_LES(sim: pio.BudgetIO, regenerate=False) -> dict:
                 "xmax": [xmax_LES(sim)],
                 "L_obu": [get_obukhov_length(sim)],
                 "zwall": [-sim.origin[2]],
-                "Ro": [sim.Ro],
+                "Ro": [sim.Ro_f],
+                "ustar": [get_ustar_nondim(sim)],
             }
         )
 
@@ -765,7 +786,14 @@ def solve_windfarm_LES(
         )
     else:
         try:
-            wake_model=get_wakemodel(wakemodel, inflow=inflow, **model_kwargs)
+            # vortex-sheet models (VortexWakeModel/VariableVortexWakeModel)
+            # take an optional ustar for vortex-decay modeling, sourced from
+            # cached LES case metadata rather than read online; see
+            # models.ustar_kwarg (no-op {} for non-vortex wakemodels, and
+            # explicit model_kwargs['ustar'] - if any - wins).
+            meta = case_meta_LES(sim) if wakemodel in models.VORTEX_MODEL_KEYS else {}
+            _model_kwargs = {**models.ustar_kwarg(wakemodel, meta), **model_kwargs}
+            wake_model = get_wakemodel(wakemodel, inflow=inflow, **_model_kwargs)
         except ValueError:
             raise
 
@@ -867,7 +895,8 @@ def solve_windfarm_setpoints(
             print(f"Warning: final march_to({meta['xmax']}) failed with error: {e}")
         return sol
 
-    wake_model = get_wakemodel(wakemodel, inflow=inflow, **(model_kwargs or {}))
+    _model_kwargs = {**models.ustar_kwarg(wakemodel, meta), **(model_kwargs or {})}
+    wake_model = get_wakemodel(wakemodel, inflow=inflow, **_model_kwargs)
     wf = mitwf.Windfarm(
         base_windfield=inflow,
         rotor_model=rotor_model,
