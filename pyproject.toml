@@ -16,8 +16,8 @@ dependencies = [
     "xarray>=2023.1",
     "foreach>=0.4.0",
     "mitwindfarm",
-    "streamtube",
-    "padeopsio @ git+https://github.com/kirbyh/padeopsIO@main",
+    "streamtube @ git+https://github.com/kirbyh/streamtube",
+    "padeopsio @ git+https://github.com/Howland-Lab/padeopsIO@main",
 ]
 
 [project.optional-dependencies]
@@ -34,4 +34,3 @@ packages = ["tandem_model"]
 
 [tool.uv.sources]
 mitwindfarm = { path = "../analysis_code/MITWindfarm" }
-streamtube = { git = "https://github.com/kirbyh/streamtube" }
