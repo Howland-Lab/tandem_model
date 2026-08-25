@@ -10,6 +10,12 @@ import polars as pl
 from pathlib import Path
 import padeopsIO as pio
 import warnings
+import socket
+
+if "stampede3" in socket.gethostname():
+    SBL_PATH = Path(r"/scratch/08445/tg877441/tandem_model/sbl")  # Stampede3 data
+else:
+    SBL_PATH = None
 
 
 def load_data(
@@ -99,7 +105,6 @@ def load_data(
 
 def load_sbl_data(load_neutral=True):
     """Load SBL data"""
-    from tandem_model.LES.sbl import SBL_PATH
     filters = (pl.col("z0") == pl.col("z0").max(), )
     if not load_neutral:
         filters += (pl.col("dTsurf_dt").ne(0), )
@@ -113,7 +118,6 @@ def load_sbl_data(load_neutral=True):
 
 def load_sbl_ABLs(runid=2, ignore_warnings=True, strict_runid=True, load_precursors=False, precursor_runid=4):
     """Load SBL and CNBL data (rotation phase)"""
-    from tandem_model.LES.sbl import SBL_PATH
     sbl = load_data(
         SBL_PATH,
         runid=runid,
