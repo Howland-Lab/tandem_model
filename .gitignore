@@ -177,5 +177,6 @@ pyrightconfig.json
 tmp/
 figs/
 notebooks/
+data/
 .vscode
 
