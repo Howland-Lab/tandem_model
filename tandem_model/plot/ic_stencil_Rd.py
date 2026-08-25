@@ -146,6 +146,7 @@ def main():
         Rd, n_iter, ali_fact, Ct = np.array(res).T
         sol = unified(CTPS, 0)
         Rd_nocorr = 0.5 * np.sqrt((1 - sol.an) / sol.u4)
+        Rd_shear = 0.5 * np.sqrt((1 - sol.an) * np.cos(sol.yaw) / (1 + sol.u4))
         ret.append(
             dict(
                 Rd=Rd,
@@ -154,8 +155,9 @@ def main():
                 sigma_IC=sigma_ic,
                 sigma_0=SIGMA_0,
                 ctps=CTPS,
-                Rd_nocorr=Rd_nocorr,
+                Rd_nocorr=Rd_nocorr,  # initial wake radius assuming 1D momentum theory
                 Rd_ratio=Rd / Rd_nocorr,
+                Rd_shear=Rd_shear,  # inital shear layer width from Bastankhah & Porté-Agel 2016, eq. 6.9
                 Ct=Ct,
             )
         )
@@ -169,6 +171,8 @@ def main():
     # plot schematic first
     plot_ic_schematic(axs[0])
     sns.lineplot(df, x="ctps", y="Rd", hue="sigma_IC", palette="cividis", ax=axs[1], legend=False)
+    # sns.lineplot(df, x="ctps", y="Rd_nocorr", color="k", ax=axs[1], legend=False)  # way over-estimates
+    # sns.lineplot(df, x="ctps", y="Rd_shear", color="tab:green", ax=axs[1], legend=False)  # too low; off the graph
     axs[2].sharey(axs[1])
     sns.lineplot(df, x="Ct", y="Rd", hue="sigma_IC", palette="cividis", ax=axs[2], legend=True)
     axs[1].set_ylabel("$R^\\mathrm{corr}_d/D$")
