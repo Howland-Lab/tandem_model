@@ -43,7 +43,7 @@ DISPLAY_NAMES = {
 # matches 2026_nawea.ipynb cell 6
 CURLED_MODEL_KWARGS = dict(
     integrator="scipy_rk23",
-    sigma_diff_ic=0.21,
+    sigma_fw=0.21,
     auto_expand=True,
     ybuff=2,
     dy=0.1,
