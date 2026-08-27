@@ -12,6 +12,8 @@ superposition models) lives in the sibling `MITWindfarm` repository, specificall
 The manuscript (preprint, public discussion, revisions, final version) are available at: 
 [https://wes.copernicus.org/preprints/wes-2026-149/](https://wes.copernicus.org/preprints/wes-2026-149/)
 
+Postprocessed LES data are available for download from [Google Drive](https://drive.google.com/file/d/1lR_DMib038eCV1Dj54btbmAl3h9GqAGT/view?usp=drive_link).
+
 ## Layout
 
 ```
